@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  node-red:
+    # 自定义镜像（官方基座 + 预装节点），构建方法见 Dockerfile / README 第四节
+    image: node-red-custom:5.0.4
+    container_name: node-red-custom
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+      - PORT=1890
+      # Node-RED 5.0 镜像不再自动指向 /data/settings.js，必须显式指定，
+      # 否则容器会按默认配置启动，adminAuth / httpNodeAuth 全部失效
+      - NODE_RED_SETTINGS=/data/settings.js
+    ports:
+      - "1890:1890"
+    volumes:
+      # 数据持久化：容器内 /data 映射到宿主机 ./data（flows/凭据/已装节点）
+      - ./data:/data
+      # 认证配置注入：使用自定义 settings.js（adminAuth + httpNodeAuth）
+      # 目标路径必须是 /data/settings.js，5.0 镜像从这读；写错成 /data/settings/settings.js 会导致配置不生效
+      - ./settings/settings.js:/data/settings.js
