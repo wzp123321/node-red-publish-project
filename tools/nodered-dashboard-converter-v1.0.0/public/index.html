@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Node-RED Dashboard v1 to v2 Converter</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1.1em;
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 968px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel h2 {
+      margin-bottom: 10px;
+      color: #333;
+      font-size: 1.3em;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 400px;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      resize: vertical;
+      transition: border-color 0.3s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    #inputJson {
+      background: #f9f9f9;
+    }
+
+    #outputJson {
+      background: #f0f7ff;
+    }
+
+    .button-container {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    #convertBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    #convertBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    #convertBtn:active {
+      transform: translateY(0);
+    }
+
+    #convertBtn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #clearBtn {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    #clearBtn:hover {
+      background: #d0d0d0;
+    }
+
+    #copyBtn {
+      background: #4caf50;
+      color: white;
+    }
+
+    #copyBtn:hover {
+      background: #45a049;
+    }
+
+    .message-container {
+      min-height: 60px;
+      margin: 10px 0;
+      position: relative;
+    }
+
+    .status {
+      text-align: center;
+      padding: 10px;
+      margin: 0;
+      border-radius: 6px;
+      font-weight: 500;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+      position: absolute;
+      width: 100%;
+      top: 0;
+      left: 0;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .info {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+
+    .info h3 {
+      color: #1976D2;
+      margin-bottom: 10px;
+    }
+
+    .info ul {
+      margin-left: 20px;
+      color: #555;
+    }
+
+    .info li {
+      margin: 5px 0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 10px;
+      color: #667eea;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+      position: absolute;
+      width: 100%;
+      top: 0;
+      left: 0;
+    }
+
+    .loading.show {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔄 Node-RED Dashboard Converter</h1>
+      <p>Convert Dashboard v1 UI components to Dashboard v2 format</p>
+    </div>
+
+    <div class="content">
+      <div class="message-container">
+        <div class="status" id="status"></div>
+        <div class="loading" id="loading">Converting...</div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>📥 Dashboard v1 JSON (Input)</h2>
+          <textarea id="inputJson" placeholder='Paste your Dashboard v1 flow JSON here - conversion happens automatically!
+
+Example format:
+{
+  "nodes": [
+    {
+      "type": "ui_button",
+      "name": "Button 1",
+      ...
+    }
+  ]
+}'></textarea>
+        </div>
+
+        <div class="panel">
+          <h2>📤 Dashboard v2 JSON (Output)</h2>
+          <textarea id="outputJson" placeholder="Converted Dashboard v2 JSON will appear here..." readonly></textarea>
+        </div>
+      </div>
+
+      <div class="button-container">
+        <button id="convertBtn" onclick="convertJson()">Convert to v2</button>
+        <button id="clearBtn" onclick="clearAll()">Clear All</button>
+        <button id="copyBtn" onclick="copyOutput()">Copy Output</button>
+      </div>
+      <p style="text-align: center; color: #666; margin-top: 10px; font-size: 0.9em;">
+        💡 Tip: Conversion happens automatically when you paste valid JSON or stop typing
+      </p>
+
+      <div class="info">
+        <h3>ℹ️ Supported Nodes</h3>
+        <ul>
+          <li><strong>ui_text</strong> → ui-text</li>
+          <li><strong>ui_form</strong> → ui-form</li>
+          <li><strong>ui_button</strong> → ui-button</li>
+          <li><strong>ui_dropdown</strong> → ui-dropdown</li>
+          <li><strong>ui_switch</strong> → ui-switch</li>
+          <li><strong>ui_slider</strong> → ui-slider</li>
+          <li><strong>ui_text_input</strong> → ui-text-input</li>
+          <li><strong>ui_numeric</strong> → ui-numeric-input</li>
+          <li><strong>ui_tab</strong> → ui-page</li>
+          <li><strong>ui_group</strong> → ui-group</li>
+        </ul>
+        <p style="margin-top: 10px; color: #666;">
+          <strong>Note:</strong> Some properties may not be fully supported. Please review the converted JSON and test in Node-RED.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function convertJson() {
+      const inputJson = document.getElementById('inputJson').value.trim();
+      const outputJson = document.getElementById('outputJson');
+      const status = document.getElementById('status');
+      const loading = document.getElementById('loading');
+      const convertBtn = document.getElementById('convertBtn');
+
+      // Clear previous status (keep space reserved)
+      hideStatus();
+
+      if (!inputJson) {
+        showStatus('Please paste Dashboard v1 JSON in the input field', 'error');
+        return;
+      }
+
+      // Validate JSON
+      let parsedInput;
+      try {
+        parsedInput = JSON.parse(inputJson);
+      } catch (e) {
+        showStatus('Invalid JSON format. Please check your input.', 'error');
+        return;
+      }
+
+      // Show loading state, hide status
+      hideStatus();
+      loading.classList.add('show');
+      convertBtn.disabled = true;
+
+      try {
+        const response = await fetch('/api/convert', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(parsedInput)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || result.error || 'Conversion failed');
+        }
+
+        // Display converted JSON
+        outputJson.value = JSON.stringify(result.data, null, 2);
+        loading.classList.remove('show');
+        showStatus('✅ Conversion successful!', 'success');
+      } catch (error) {
+        loading.classList.remove('show');
+        showStatus('❌ Error: ' + error.message, 'error');
+        outputJson.value = '';
+      } finally {
+        convertBtn.disabled = false;
+      }
+    }
+
+    function clearAll() {
+      document.getElementById('inputJson').value = '';
+      document.getElementById('outputJson').value = '';
+      hideStatus();
+    }
+
+    function copyOutput() {
+      const outputJson = document.getElementById('outputJson');
+      if (!outputJson.value.trim()) {
+        showStatus('No output to copy', 'error');
+        return;
+      }
+
+      outputJson.select();
+      document.execCommand('copy');
+      showStatus('✅ Output copied to clipboard!', 'success');
+      
+      // Clear selection
+      window.getSelection().removeAllRanges();
+    }
+
+    function showStatus(message, type) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = `status ${type}`;
+      
+      // Auto-hide success messages after 3 seconds
+      if (type === 'success') {
+        setTimeout(() => {
+          status.className = 'status';
+          status.textContent = '';
+        }, 3000);
+      }
+    }
+
+    function hideStatus() {
+      const status = document.getElementById('status');
+      status.className = 'status';
+      status.textContent = '';
+    }
+
+    // Allow Enter+Ctrl/Cmd to convert
+    document.getElementById('inputJson').addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        convertJson();
+      }
+    });
+
+    // Auto-convert on paste
+    let pasteTimeout;
+    const inputTextarea = document.getElementById('inputJson');
+    
+    inputTextarea.addEventListener('paste', () => {
+      // Clear any existing timeout
+      clearTimeout(pasteTimeout);
+      
+      // Wait for paste to complete, then convert
+      pasteTimeout = setTimeout(() => {
+        const inputValue = inputTextarea.value.trim();
+        if (inputValue) {
+          // Validate if it looks like JSON before converting
+          try {
+            JSON.parse(inputValue);
+            convertJson();
+          } catch (e) {
+            // Not valid JSON yet, might be incomplete paste
+            // Try again after a longer delay
+            setTimeout(() => {
+              const retryValue = inputTextarea.value.trim();
+              if (retryValue) {
+                try {
+                  JSON.parse(retryValue);
+                  convertJson();
+                } catch (e2) {
+                  // Still not valid, user might be typing manually
+                }
+              }
+            }, 500);
+          }
+        }
+      }, 100);
+    });
+
+    // Also auto-convert on input changes (debounced) for manual typing
+    let inputTimeout;
+    inputTextarea.addEventListener('input', () => {
+      clearTimeout(inputTimeout);
+      inputTimeout = setTimeout(() => {
+        const inputValue = inputTextarea.value.trim();
+        if (inputValue) {
+          try {
+            JSON.parse(inputValue);
+            convertJson();
+          } catch (e) {
+            // Not valid JSON, don't convert
+          }
+        }
+      }, 1000); // Wait 1 second after typing stops
+    });
+  </script>
+</body>
+</html>
+

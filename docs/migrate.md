@@ -37,6 +37,8 @@ docker cp energy-nodered-hvac-0:/data/. /deploy/old-node-red-data/
 ls /deploy/old-node-red-data/flows.json    # 确认存在再继续
 ```
 
+> **容器名按现场替换**：`energy-nodered-hvac-0` 是**溧阳**现场的容器名；**张家港**现场是 `nodered`。下面所有命令里的 `energy-nodered-hvac-0` 在张家港都要替换成 `nodered`。
+
 > 这一步现在改成**手动操作**（见 [第 2 节](#2-兼容性处理scan-compatsh) 的"手动备份"小节）。
 
 ### 1.2 用 converter 工具把 flows.json 转 v2

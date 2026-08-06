@@ -1,0 +1,23 @@
+{
+  "name": "nodered-dashboard-converter",
+  "version": "1.0.0",
+  "description": "Web interface for converting Node-RED Dashboard v1 to v2",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "nodered",
+    "dashboard",
+    "converter",
+    "migration"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "@flowfuse/node-red-dashboard-2-migration": "github:FlowFuse/node-red-dashboard-2-migration"
+  }
+}
+

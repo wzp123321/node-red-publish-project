@@ -1,0 +1,20 @@
+Node-RED Dashboard Converter v1.0.0
+===================================
+
+QUICK START:
+------------
+
+macOS/Linux:
+  ./run.sh
+
+Windows:
+  run.bat
+
+MANUAL INSTALLATION:
+-------------------
+  npm install
+  npm start
+
+Then open: http://localhost:3000
+
+For more details, see README.md
