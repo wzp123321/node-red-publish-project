@@ -81,16 +81,16 @@ ls /deploy/old-node-red-data/flows.json    # 确认存在再继续
 
 ### 3.2 节点转换支持清单
 
-| 转换结果           | 节点                                                                                                                                     | 说明 / 后续处理                                                                                                                |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| 自动转换           | `ui_text` / `ui_button` / `ui_slider` / `ui_switch` / `ui_dropdown` / `ui_numeric` / `ui_text_input` / `ui_form` / `ui_tab` / `ui_group` | 重命名为 v2（kebab-case，如 `ui-text`）                                                                                        |
-| 工具自动特殊处理   | `ui-base` / `ui-theme`                                                                                                                   | 自动新增默认配置（旧的 v1 `ui_base` 会被标 `d: true` 但保留）                                                                  |
-| 不支持，需人工     | `ui_chart`                                                                                                                               | 类型改 `ui-chart` + 字段重排（见 [3.3.1](#331-ui_chart改字段a-类)）+ 上游补数据契约（见 [3.3.2](#332-ui_chart补数据契约b-类)） |
-| 不支持，需人工     | `ui_template`                                                                                                                            | v3 走 Vue3 不接 AngularJS，必须业务重写（见 [3.3.3](#333-ui_template必须重写c-类)）                                            |
-| 不支持，需人工     | `ui_date_picker`                                                                                                                         | v2/v3 无独立节点，改 `ui-text-input` 并设 `mode=date`（见 [3.3.4](#334-ui_date_picker换成-ui-text-inputc-2-类)）               |
-| 不支持，需人工确认 | `ui_spacer` / `ui_gauge` / `ui_audio` / `ui_toast` / `ui_control` / `ui_colour_picker` / 旧 `ui_base`                                    | 工具标 `d: true` 原样保留，画布显示 unknown type，人工确认删/留                                                                |
+| 转换结果           | 节点                                                                                                                                     | 说明 / 后续处理                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 自动转换           | `ui_text` / `ui_button` / `ui_slider` / `ui_switch` / `ui_dropdown` / `ui_numeric` / `ui_text_input` / `ui_form` / `ui_tab` / `ui_group` | 重命名为 v2（kebab-case，如 `ui-text`）                                                                                                |
+| 工具自动特殊处理   | `ui-base` / `ui-theme`                                                                                                                   | 自动新增默认配置（旧的 v1 `ui_base` 会被标 `d: true` 但保留）                                                                          |
+| 工具自动特殊处理   | `ui_date_picker`                                                                                                                         | 自动改 `ui-text-input` 并设 `mode=date`，输出时间戳与 v1 一致，转换后直接可用（见 [3.3.4](#334-ui_date_picker工具已自动转换无需人工)） |
+| 不支持，需人工     | `ui_chart`                                                                                                                               | 类型改 `ui-chart` + 字段重排（见 [3.3.1](#331-ui_chart改字段a-类)）+ 上游补数据契约（见 [3.3.2](#332-ui_chart补数据契约b-类)）         |
+| 不支持，需人工     | `ui_template`                                                                                                                            | v3 走 Vue3 不接 AngularJS，必须业务重写（见 [3.3.3](#333-ui_template必须重写c-类)）                                                    |
+| 不支持，需人工确认 | `ui_spacer` / `ui_gauge` / `ui_audio` / `ui_toast` / `ui_control` / `ui_colour_picker` / 旧 `ui_base`                                    | 工具标 `d: true` 原样保留，画布显示 unknown type，人工确认删/留                                                                        |
 
-### 3.3 人工处理（全部转人工）
+### 3.3 人工处理（除 ui_date_picker 已自动转换，其余转人工）
 
 #### 3.3.1 ui_chart：改字段（A 类）
 
@@ -161,32 +161,23 @@ v3 的 `ui-template` 走 Vue 3，不接 AngularJS 语法；**没有 1:1 替代�
 
 残留节点（`d: true`）启动时不报错，但会以 unknown type 留在画布上。人工重写后可直接在编辑器里删除原节点。
 
-#### 3.3.4 ui_date_picker：换成 ui-text-input（C-2 类）
+#### 3.3.4 ui_date_picker：工具已自动转换（无需人工）
 
-**为什么不能自动改**：v1 的 `ui_date_picker` 在 v2/v3 里**没有对应独立节点**。v2 设计上把 date/time/datetime 这类输入控件合并进了 `ui-text-input`，通过 `mode` 字段配置（`mode: 'date' | 'time' | 'datetime-local' | 'week' | 'month'`）。v3 沿用了这个设计。
+**背景**：v1 的 `ui_date_picker` 在 v2/v3 里**没有对应独立节点**。v2 设计上把 date/time/datetime 这类输入控件合并进了 `ui-text-input`，通过 `mode` 字段配置（`mode: 'date' | 'time' | 'datetime-local' | 'week' | 'month'`）。v3 沿用了这个设计。
 
-**converter 为什么不处理**：`@flowfuse/node-red-dashboard-2-migration` 的 `transformers/map.json` 里没有 `ui_date_picker` 这一项，工具跑完后这个节点会被标 `d:true` 原样保留。
+**converter 现已自动处理**：官方库（`@flowfuse/node-red-dashboard-2-migration`）原本不支持该节点，工具在后处理阶段自动完成转换，**无需人工操作**。转换前后字段对照：
 
-**人工处理步骤**（v3 编辑器里操作）：
+| v1 `ui_date_picker` 字段                                                                                                  | 转换后 `ui-text-input` 字段          | 备注                                               |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------- |
+| `type` = `ui_date_picker`                                                                                                 | `type` = `ui-text-input`             | 自动改写                                           |
+| `label` / `group` / `order` / `width` / `height` / `passthru` / `topic` / `topicType` / `className` / `x` / `y` / `wires` | 同名                                 | 保留（group / wires 引用已重映射到 v2 新 id）      |
+| —                                                                                                                         | `mode` = `'date'`                    | 自动新增                                           |
+| —                                                                                                                         | `delay` = 300 / `sendOnDelay` = true | 自动新增，只开防抖发送，避免一次选择重复发多条消息 |
+| `d: true`（官方库标禁用）                                                                                                 | 已删除                               | 解除禁用，转换后直接可用                           |
 
-1. 选中 v1 `ui_date_picker` 节点
-2. 删掉它
-3. 在同 group 拖一个 `ui-text-input` 节点
-4. 按下表字段映射配置：
+**输出行为一致**：v1 date picker 与 v2 text-input(date) 都输出 epoch 毫秒时间戳，下游 function 节点无需改动。
 
-| v1 `ui_date_picker` 字段     | v3 `ui-text-input` 字段      | 备注                                                                                        |
-| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `name`                       | `name`                       | 保留                                                                                        |
-| `label`（默认 `'date'`）     | `label`                      | v3 默认是 `'Text Input'`，**必须手动改成 `'date'`**（业务方约定）                           |
-| `group`                      | `group`                      | 保留                                                                                        |
-| `order` / `width` / `height` | `order` / `width` / `height` | 保留                                                                                        |
-| `passthru`                   | `passthru`                   | 保留                                                                                        |
-| `topic` / `topicType`        | `topic` / `topicType`        | 保留                                                                                        |
-| `className`                  | `className`                  | 保留                                                                                        |
-| —                            | `mode`                       | **新增**，设为 `'date'`（按业务需要也可 `'datetime-local'`）                                |
-| （输入 msg）                 | `payload`                    | v1 是 epoch 毫秒；v3 `ui-text-input` 输出的也是字符串，**接入时可能要 function 节点转类型** |
-
-**快速检查方法**：converter 转换后人工在画布上查找 unknown type 节点，或 `grep ui_date_picker flows.v2.json` 确认是否用过该节点——没用到就跳过本节。
+**转换后检查**：转换报告会显示「✔ ui_date_picker → ui-text-input(date) 已转换 N 个」；也可 `grep '"type": "ui-text-input"' flows.v2.json` 核对，全部自动完成。
 
 #### 3.3.5 ui_spacer / ui_gauge 等：确认删/留
 
@@ -194,7 +185,7 @@ v3 的 `ui-template` 走 Vue 3，不接 AngularJS 语法；**没有 1:1 替代�
 
 ### 3.4 转换完成后：启动 + 验证
 
-> 时序要点：**手动备份 → converter 转换 → 人工处理（字段 / 契约 / 重写 / 换节点）→ 手动部署**。后一步严格依赖前一步的产物。
+> 时序要点：**手动备份 → converter 转换 → 人工处理（ui_chart / ui_template / 其他 unknown type；ui_date_picker 已自动转换）→ 手动部署**。后一步严格依赖前一步的产物。
 
 ```bash
 # 手动部署（转换 + 人工处理完后再复制）

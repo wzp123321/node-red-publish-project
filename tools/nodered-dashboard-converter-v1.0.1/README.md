@@ -126,11 +126,9 @@ Response:
 
 ## Limitations
 
-Some nodes and properties are not yet supported:
-- `ui_date_picker`
+Some nodes and properties are not yet supported (官方迁移库限制；`ui_chart`、`ui_date_picker` 已由本项目扩展支持，见下方说明):
 - `ui_colour_picker`
 - `ui_gauge`
-- `ui_chart`
 - `ui_audio`
 - `ui_toast`
 - `ui_control`
@@ -139,6 +137,10 @@ Some nodes and properties are not yet supported:
 Additionally, some properties may not be fully migrated:
 - `ui_switch`: `.tooltip`, `.decouple`, `.animate` are not supported
 - `ui_text_input`: `.tooltip` is not supported
+
+本项目在官方迁移基础上的扩展支持：
+- `ui_chart` → `ui-chart`（字段改写，转换后标记禁用 d:true，需手动启用）
+- `ui_date_picker` → `ui-text-input`（`mode: date`，输出时间戳行为与 v1 一致，转换后直接可用）
 
 ## Port Configuration
 

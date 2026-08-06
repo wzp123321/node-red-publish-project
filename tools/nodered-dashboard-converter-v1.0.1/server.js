@@ -55,6 +55,22 @@ function migrateUiChart(node) {
   return node;
 }
 
+// ui_date_picker → ui-text-input（mode: date）
+// Dashboard 2.0 没有独立的日期选择节点，官方等价方案是 ui-text-input 的 date 模式。
+// 行为一致：v1 date picker 与 v2 text-input(date) 都输出 epoch 毫秒时间戳，下游链路无需改动。
+// 发送条件只开 sendOnDelay：date 模式若同时勾选 delay/blur/enter，一次选择会重复发 3 条消息。
+function migrateUiDatePicker(node) {
+  node.type = "ui-text-input";
+  node.mode = "date";
+  node.delay = 300;
+  node.sendOnDelay = true;
+  node.sendOnBlur = false;
+  node.sendOnEnter = false;
+  // 官方库对未支持的 ui_ 节点统一加 d:true 禁用；此处为行为等价的转换，解除禁用使其直接可用
+  delete node.d;
+  return node;
+}
+
 // 替换 http request 节点 url 前缀（startswith 匹配，与 scan-compat.sh 一致）
 function replaceHttpUrls(nodes, oldPrefix, newPrefix) {
   let hit = 0;
@@ -179,12 +195,16 @@ app.post("/api/convert", (req, res) => {
     let httpReplaced = 0;
     let httpTotal = 0;
     let chartsMigrated = 0;
+    let datePickersMigrated = 0;
 
     // ui_chart → ui-chart 字段改写（官方库不支持，参考 scan-compat.sh）
     dashboardV2Json.forEach((node) => {
       if (node.type === "ui_chart") {
         migrateUiChart(node);
         chartsMigrated++;
+      } else if (node.type === "ui_date_picker") {
+        migrateUiDatePicker(node);
+        datePickersMigrated++;
       }
     });
 
@@ -211,6 +231,7 @@ app.post("/api/convert", (req, res) => {
         httpReplaced,
         httpTotal,
         chartsMigrated,
+        datePickersMigrated,
         unhandled,
         httpUrls,
       },

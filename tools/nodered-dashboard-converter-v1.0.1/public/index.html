@@ -630,6 +630,13 @@ Example format:
           );
         }
 
+        // ui_date_picker 转换
+        if (meta.datePickersMigrated > 0) {
+          lines.push(
+            `<span class="ok-line">✔ ui_date_picker → ui-text-input(date) 已转换 ${meta.datePickersMigrated} 个</span>`,
+          );
+        }
+
         // 无法处理的节点
         const unhandled = meta.unhandled || {};
         const types = Object.keys(unhandled);
