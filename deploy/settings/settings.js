@@ -33,8 +33,17 @@ module.exports = {
   /** 流程文件（相对 /data 用户目录） */
   flowFile: "flows.json", // 官方默认就是 flows.json，显式列出便于审计
 
-  /** ⚠ 现场修改：从注释改为启用（与老容器同步，保证 flows_cred.json 能解密） */
-  credentialSecret: "88d387cabb2fa6b4e25aab8f1b4c0a91cb75cbed9f8410fb",
+  /** By default, credentials are encrypted in storage using a generated key. To
+   * specify your own secret, set the following property.
+   * If you want to disable encryption of credentials, set this property to false.
+   * Note: once you set this property, do not change it - doing so will prevent
+   * node-red from being able to decrypt your existing credentials and they will be
+   * lost.
+   */
+  //credentialSecret: "a-secret-key",
+
+  /** 目前现场都没有设置，所以这里也不设置 */
+  // credentialSecret: "88d387cabb2fa6b4e25aab8f1b4c0a91cb75cbed9f8410fb",
 
   /** 流程 JSON 多行格式化（便于 git diff）——官方默认 true */
   flowFilePretty: true,

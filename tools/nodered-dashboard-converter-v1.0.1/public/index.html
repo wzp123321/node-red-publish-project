@@ -343,6 +343,16 @@
         font-size: 13px;
       }
 
+      .report .url-code {
+        background: #f0f0f0;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-family: "Monaco", "Menlo", monospace;
+        font-size: 12px;
+        color: #333;
+        word-break: break-all;
+      }
+
       .report .ok-line {
         color: #2e7d32;
       }
@@ -586,6 +596,28 @@ Example format:
           lines.push(
             `http request url 替换：${meta.httpReplaced}/${meta.httpTotal} 个`,
           );
+        }
+
+        // http request 接口地址统计
+        const httpUrls = meta.httpUrls;
+        if (httpUrls && httpUrls.total > 0) {
+          lines.push(
+            `<span class="ok-line">🌐 http request 接口 ${httpUrls.total} 个（去重后 ${httpUrls.unique} 个）</span>`,
+          );
+          details.push(
+            '<p class="warn-line">http request 接口地址列表（按接口去重）：</p>',
+          );
+          details.push("<ul>");
+          httpUrls.urls.forEach((u) => {
+            const method = u.nodes[0]?.method || "GET";
+            const nodeNames = u.nodes
+              .map((n) => (n.name ? `${n.name}` : n.id))
+              .join("、");
+            details.push(
+              `<li><strong>${escapeHtml(method)}</strong> <code class="url-code">${escapeHtml(u.url)}</code> <span style="color:#999">使用 ${u.count} 次${nodeNames ? `（${escapeHtml(nodeNames)}）` : ""}</span></li>`,
+            );
+          });
+          details.push("</ul>");
         }
 
         // ui_chart 转换

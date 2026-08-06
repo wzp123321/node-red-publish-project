@@ -38,7 +38,13 @@ docker exec energy-nodered-hvac-0 grep credentialSecret /data/settings.js   # �
 
 # 2) 把自动密钥文件拷给新服务（settings.js 保持不写 credentialSecret）
 docker cp energy-nodered-hvac-0:/data/.config.runtime.json /deploy/data/.config.runtime.json
+
+# 3) 给权限：新容器内 node-red 用户（UID 1000）需可读可写该文件
+#    否则启动时报 EACCES（备份 .config.runtime.json → .backup 失败）
+sudo chown 1000:1000 /deploy/data/
 ```
+
+> `.config.runtime.json` 是 Node-RED 启动时读取/更新的运行时配置（更新前会先复制 `.backup`），文件 owner 若非 UID 1000 会导致启动报 `EACCES: permission denied`。若 `/deploy/data/` 目录本身也是 root 所有，一并执行 `sudo chown -R 1000:1000 /deploy/data/`。
 
 > 兜底：凭据不重要时，直接删掉新服务 `/deploy/data/flows_cred.json` 重新开始，但 MQTT / HTTP 等需要密钥的节点都要重新配置。
 

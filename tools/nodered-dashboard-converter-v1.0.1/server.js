@@ -74,6 +74,39 @@ function replaceHttpUrls(nodes, oldPrefix, newPrefix) {
   return hit;
 }
 
+// 统计 http request 节点用到的所有接口地址（按 url 去重）
+function collectHttpUrls(nodes) {
+  const list = [];
+  nodes.forEach((node) => {
+    if (node.type === "http request") {
+      list.push({
+        id: node.id,
+        name: node.name || node.label || "",
+        method: node.method || "GET",
+        url: typeof node.url === "string" ? node.url : "",
+      });
+    }
+  });
+
+  // 按 url 去重（url 为空/未配置的归为一类）
+  const byUrl = new Map();
+  list.forEach((item) => {
+    const key = item.url || "(未配置/动态)";
+    if (!byUrl.has(key)) {
+      byUrl.set(key, { url: key, count: 0, nodes: [] });
+    }
+    const entry = byUrl.get(key);
+    entry.count++;
+    entry.nodes.push({ id: item.id, name: item.name, method: item.method });
+  });
+
+  return {
+    total: list.length,
+    unique: byUrl.size,
+    urls: Array.from(byUrl.values()),
+  };
+}
+
 // 分类统计无法处理的节点（migrate 后 type 仍以 ui_ 开头的 v1 残留）
 function collectUnhandled(nodes) {
   const unhandled = {};
@@ -168,6 +201,9 @@ app.post("/api/convert", (req, res) => {
     // 分类统计无法处理的节点
     const unhandled = collectUnhandled(dashboardV2Json);
 
+    // 统计 http request 接口地址
+    const httpUrls = collectHttpUrls(dashboardV2Json);
+
     res.json({
       success: true,
       data: dashboardV2Json,
@@ -176,6 +212,7 @@ app.post("/api/convert", (req, res) => {
         httpTotal,
         chartsMigrated,
         unhandled,
+        httpUrls,
       },
     });
   } catch (error) {
