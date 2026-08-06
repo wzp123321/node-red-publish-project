@@ -21,22 +21,23 @@ USER node-red
 
 # ---------- 预装第三方节点清单（锁定版本，按需增删）----------
 # 规则：构建前用 `npm view <包名> version` 查询最新稳定版并锁定，保证构建可复现
-# 每行一个 RUN，便于 Docker 构建缓存复用
+#
+# 减小体积的做法：
+#   1. 所有节点合并为一次 npm install，npm 对共同依赖统一去重（hoisting），
+#      避免分多次安装产生重复依赖，node_modules 更小
+#   2. 安装与清理缓存在同一 RUN 层内完成：npm / 原生模块缓存不残留进镜像层；
+#      若拆成多个 RUN，缓存虽在运行时不可见，物理上仍占镜像体积
+#   3. 代价：合并后按节点拆分的构建缓存失效；频繁增删节点导致反复全量安装时，
+#      可权衡拆回每行一个 RUN（体积略增、构建缓存可复用）
+#
+# --no-package-lock：不生成/不更新 package-lock.json，保持镜像层干净
 
-# Dashboard 2.0 前端节点（前端页面 /dashboard 必需）
-RUN npm install --no-audit --no-fund @flowfuse/node-red-dashboard@1.30.2
+RUN npm install --no-audit --no-fund --no-package-lock \
+    @flowfuse/node-red-dashboard@1.30.2 \
+    node-red-node-sqlite@2.0.1 \
+    node-red-contrib-modbus@5.60.1 \
+    node-red-contrib-s7@3.1.3 \
+    && rm -rf ~/.npm ~/.cache/node-gyp ~/.cache/prebuild-install
 
-# sqlite 数据库节点（业务数据存储，按需启用；含原生编译，构建耗时较长）
-RUN npm install --no-audit --no-fund node-red-node-sqlite@2.0.1
-
-# Modbus 通信节点（工业设备 Modbus TCP/RTU 通信）
-RUN npm install --no-audit --no-fund node-red-contrib-modbus@5.60.1
-
-# Siemens S7 通信节点（S7 PLC 通信）
-RUN npm install --no-audit --no-fund node-red-contrib-s7@3.1.3
-
-# 其他节点按需求追加，同样锁定版本：
-# RUN npm install --no-audit --no-fund <node-package>@<version>
-
-# 节点装入 /usr/src/node-red/node_modules（镜像层固化），
-# 与数据卷 /data（flows/凭据）互不干扰；沿用官方镜像默认启动命令
+# 其他节点按需求追加，直接加在上面的 npm install 参数列表中（锁定版本）：
+# 例如：node-red-contrib-xxx@x.y.z
