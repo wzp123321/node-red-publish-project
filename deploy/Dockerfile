@@ -12,7 +12,7 @@
 #
 # 现场导入并启动：
 #   docker load -i node-red-5.0.4.tar.gz
-#   docker compose up -d
+#   启动命令见 docs/deploy.md：docker run 命令行显式指定端口/挂载/认证配置
 
 FROM nodered/node-red:5.0.4
 
