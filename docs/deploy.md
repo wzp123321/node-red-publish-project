@@ -4,7 +4,7 @@
 
 官方镜像只含核心节点，不含 dashboard 等第三方节点。
 
-> **先准备配置文件（在 `mkdir -p data` 之前）**：本方式需要 `settings.js` 与 `Dockerfile` 两个文件，按下面的目录结构放好后再执行启动命令。
+> **先准备配置文件（在** **`mkdir -p data`** **之前）**：本方式需要 `settings.js` 与 `Dockerfile` 两个文件，按下面的目录结构放好后再执行启动命令。
 
 **部署目录结构**（将仓库 `deploy/` 目录整体拷贝到服务器，作为工作目录）：
 
@@ -21,13 +21,13 @@ deploy/                      # 部署工作目录
 
 **settings/settings.js 内容说明**（完整版见仓库 `deploy/settings/settings.js`，要点如下）：
 
-| 配置项             | 作用                                                            |
-| ------------------ | --------------------------------------------------------------- |
-| `credentialSecret` | 凭据加密密钥，必须与 `flows_cred.json` 成对备份，丢失后无法解密 |
-| `adminAuth`        | 编程页面 `/` 登录认证：`admin` / `3er4#ER$`（完全权限）         |
-| `httpNodeAuth`     | 前端页面 `/dashboard` 浏览器 Basic 认证：`user` / `Nts@1234`    |
-| `uiPort`           | 容器内监听端口，需与 `-p` 端口映射保持一致                      |
-| `externalModules`  | `autoInstall: true` 允许编辑器在线安装节点（仅在线场景需要）    |
+| 配置项                | 作用                                                 |
+| ------------------ | -------------------------------------------------- |
+| `credentialSecret` | 凭据加密密钥，必须与 `flows_cred.json` 成对备份，丢失后无法解密          |
+| `adminAuth`        | 编程页面 `/` 登录认证：`admin` / `3er4#ER$`（完全权限）           |
+| `httpNodeAuth`     | 前端页面 `/dashboard` 浏览器 Basic 认证：`user` / `Nts@1234` |
+| `uiPort`           | 容器内监听端口，需与 `-p` 端口映射保持一致                           |
+| `externalModules`  | `autoInstall: true` 允许编辑器在线安装节点（仅在线场景需要）           |
 
 **Dockerfile 内容说明**（完整版见仓库 `deploy/Dockerfile`，方式 A 不参与构建）：
 
@@ -57,17 +57,17 @@ curl -I http://localhost:1880  # 返回 200
 
 浏览器访问 `http://服务器IP:1880`，登录页出现即成功（账户见第三章）。
 
----
+***
 
 ## 二、镜像打包与离线部署（给现场）
 
 ### 2.1 打包需要哪些文件
 
-| 文件                 | 作用                         | 构建机（打包） | 现场（运行） |
-| -------------------- | ---------------------------- | -------------- | ------------ |
-| Dockerfile           | 定义镜像内容（预装哪些节点） | ✅ 需要        | ❌ 不需要    |
-| settings/settings.js | 双账户认证配置               | ✅ 验证时用    | ✅ 需要      |
-| data/                | 数据持久化目录               | 自动生成       | ✅ 需要      |
+| 文件                   | 作用             | 构建机（打包） | 现场（运行） |
+| -------------------- | -------------- | ------- | ------ |
+| Dockerfile           | 定义镜像内容（预装哪些节点） | ✅ 需要    | ❌ 不需要  |
+| settings/settings.js | 双账户认证配置        | ✅ 验证时用  | ✅ 需要   |
+| data/                | 数据持久化目录        | 自动生成    | ✅ 需要   |
 
 ### 2.2 构建机（有外网）执行哪些命令
 
@@ -100,7 +100,7 @@ docker save node-red-custom:5.0.4 | gzip > node-red-custom-5.0.4.tar.gz
 # 1. 导入镜像（本地导入，全程不联网）
 docker load < node-red-custom-5.0.4.tar.gz
 
-# 2. 进入 deploy/ 目录，准备数据目录与配置（settings.js 必须存在，否则容器启动失败）
+# 2. 进入 deploy/ 目录，准备数据目录与配置（settings.js 必须存在，否则容器启动失败）----直接将整个deploy文件夹上传到服务器的话则不需要这一步
 cd deploy
 mkdir -p data
 ls settings/settings.js        # 确认文件存在，缺失则把 deploy/settings/settings.js 复制到 settings/ 下
@@ -155,16 +155,16 @@ docker save node-red-custom:5.0.4 | gzip > node-red-custom-5.0.4.tar.gz
 
 将新包带到现场：`docker load -i` → 备份 `./data` → 按 2.3 重新启动。
 
----
+***
 
 ## 三、双入口认证（部署后登录用）
 
-| 入口     | 地址                       | 账户    | 密码       | 认证方式          | 权限                        |
-| -------- | -------------------------- | ------- | ---------- | ----------------- | --------------------------- |
-| 编程页面 | `http://IP:1880/`          | `admin` | `3er4#ER$` | Node-RED 登录页   | 完全权限（可编辑/部署流程） |
-| 前端页面 | `http://IP:1880/dashboard` | `user`  | `Nts@1234` | 浏览器 Basic 弹窗 | 查看 UI 界面                |
+| 入口   | 地址                         | 账户      | 密码         | 认证方式         | 权限             |
+| ---- | -------------------------- | ------- | ---------- | ------------ | -------------- |
+| 编程页面 | `http://IP:1880/`          | `admin` | `3er4#ER$` | Node-RED 登录页 | 完全权限（可编辑/部署流程） |
+| 前端页面 | `http://IP:1880/dashboard` | `user`  | `Nts@1234` | 浏览器 Basic 弹窗 | 查看 UI 界面       |
 
----
+***
 
 ## 四、数据持久化
 
@@ -178,11 +178,11 @@ docker save node-red-custom:5.0.4 | gzip > node-red-custom-5.0.4.tar.gz
 
 sqlite 节点不做相对路径解析，db 文件位置取决于你在节点配置 `Database` 里填的路径：
 
-| 填写的路径              | db 文件实际位置                                          | 持久化                  |
-| ----------------------- | -------------------------------------------------------- | ----------------------- |
-| `mydb.db`（相对）       | 容器内 `/usr/src/node-red/mydb.db`（工作目录，非数据卷） | ❌ 容器重建即丢失       |
-| `./data/mydb.db`        | 容器内 `/usr/src/node-red/data/`                         | ❌ 同上                 |
-| `/data/mydb.db`（绝对） | 容器内 `/data/` → 宿主机 `./data/`                       | ✅ 随 `./data` 备份迁移 |
+| 填写的路径               | db 文件实际位置                                  | 持久化               |
+| ------------------- | ------------------------------------------ | ----------------- |
+| `mydb.db`（相对）       | 容器内 `/usr/src/node-red/mydb.db`（工作目录，非数据卷） | ❌ 容器重建即丢失         |
+| `./data/mydb.db`    | 容器内 `/usr/src/node-red/data/`              | ❌ 同上              |
+| `/data/mydb.db`（绝对） | 容器内 `/data/` → 宿主机 `./data/`               | ✅ 随 `./data` 备份迁移 |
 
 **务必填绝对路径**，例如 `/data/mydb.db`，db 文件才会落在宿主机 `./data` 下并与 flows、凭据一起持久化。现场离线场景如需带已有 db 文件，直接放入 `./data/` 后启动即可。
 
@@ -194,7 +194,7 @@ sqlite 节点不做相对路径解析，db 文件位置取决于你在节点配�
 - **sqlite WAL 附属文件**：若 db 启用了 WAL 模式（`journal_mode=WAL`），还会生成 `xxx.db-wal`、`xxx.db-shm`，只拷 `.db` 主文件会丢未合并数据。停容器后 WAL 自动合并；确需在线备份可用 sqlite3 的 `.backup` 命令。
 - **凭据成对备份**：`flows_cred.json` 依赖 `settings.js` 中的 `credentialSecret` 解密，两者必须**成对**备份/迁移。只拷 `./data` 不拷 `./settings/settings.js`，现场将无法解密凭据。
 
----
+***
 
 ## 五、安装节点（仅在线部署需要）
 
@@ -210,19 +210,19 @@ docker restart node-red
 
 > 命令安装的节点写入 `/data/node_modules`（已持久化），重启/重建容器不丢。
 
----
+***
 
 ## 六、常用运维命令
 
-| 操作     | 命令                                     |
-| -------- | ---------------------------------------- |
-| 查看状态 | `docker ps`                              |
-| 查看日志 | `docker logs -f node-red`                |
-| 重启     | `docker restart node-red`                |
-| 停止     | `docker stop node-red`                   |
+| 操作   | 命令                           |
+| ---- | ---------------------------- |
+| 查看状态 | `docker ps`                  |
+| 查看日志 | `docker logs -f node-red`    |
+| 重启   | `docker restart node-red`    |
+| 停止   | `docker stop node-red`       |
 | 升级镜像 | 备份 `./data` → 重新构建/拉取 → 重新启动 |
 
----
+***
 
 ## 七、注意事项
 
@@ -231,3 +231,4 @@ docker restart node-red
 - 请妥善保管 `settings.js` 中的 `credentialSecret`，丢失后 `flows_cred.json` 无法解密。
 - 端口如需变更，修改 `-p` 映射并保持 `-e PORT` 一致后重启容器（如 `-p 8080:1880`，示例见 2.3.1）。
 - **Node-RED 5.0 镜像必须显式设置** **`-e NODE_RED_SETTINGS=/data/settings.js`**，否则挂载的 settings.js 不会被加载，adminAuth / httpNodeAuth 全部失效（表现为 `/` 和 `/dashboard` 都不弹登录页）。docker run 部署必须在命令中手动加上。
+
