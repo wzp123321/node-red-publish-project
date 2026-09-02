@@ -7,10 +7,10 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.5)
 
-2026-09-02T19:13:30.710+08:00  INFO 11296 --- [node-server] [           main] com.platform.NodeServerApplication       : Starting NodeServerApplication v1.0.0 using Java 21.0.11 with PID 11296 (E:\workspace\private\node-red-publish-project\node-server\target\node-server.jar started by wanzh in E:\workspace\private\node-red-publish-project\node-server)
-2026-09-02T19:13:30.713+08:00  INFO 11296 --- [node-server] [           main] com.platform.NodeServerApplication       : No active profile set, falling back to 1 default profile: "default"
-2026-09-02T19:13:31.638+08:00  WARN 11296 --- [node-server] [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: java.lang.IllegalArgumentException: Invalid value type for attribute 'factoryBeanObjectType': java.lang.String
-2026-09-02T19:13:31.663+08:00 ERROR 11296 --- [node-server] [           main] o.s.boot.SpringApplication               : Application run failed
+2026-09-02T19:14:17.611+08:00  INFO 21828 --- [node-server] [           main] com.platform.NodeServerApplication       : Starting NodeServerApplication v1.0.0 using Java 21.0.11 with PID 21828 (E:\workspace\private\node-red-publish-project\node-server\target\node-server.jar started by wanzh in E:\workspace\private\node-red-publish-project\node-server)
+2026-09-02T19:14:17.614+08:00  INFO 21828 --- [node-server] [           main] com.platform.NodeServerApplication       : No active profile set, falling back to 1 default profile: "default"
+2026-09-02T19:14:18.515+08:00  WARN 21828 --- [node-server] [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: java.lang.IllegalArgumentException: Invalid value type for attribute 'factoryBeanObjectType': java.lang.String
+2026-09-02T19:14:18.541+08:00 ERROR 21828 --- [node-server] [           main] o.s.boot.SpringApplication               : Application run failed
 
 java.lang.IllegalArgumentException: Invalid value type for attribute 'factoryBeanObjectType': java.lang.String
 	at org.springframework.beans.factory.support.FactoryBeanRegistrySupport.getTypeForFactoryBeanFromAttributes(FactoryBeanRegistrySupport.java:86) ~[spring-beans-6.1.6.jar!/:6.1.6]
