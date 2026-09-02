@@ -1,0 +1,58 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+spring:
+  application:
+    name: node-server
+
+  # ===== H2 默认（零配置启动，文件模式，重启数据不丢） =====
+  datasource:
+    url: jdbc:h2:file:./data/nodedb;MODE=MySQL;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+      # 重启时索引/外键已存在会报错，continue-on-error=true 兜底
+      continue-on-error: true
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+# ===== MyBatis-Plus =====
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.platform.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: null
+
+# ===== 业务参数 =====
+platform:
+  # 心跳超时阈值倍数（最后心跳时间 > N × 心跳间隔 → 标记离线）
+  heartbeat-offline-multiplier: 2
+  # 离线自动注销阈值（小时）。超过该时长仍离线则自动注销实例
+  auto-deregister-hours: 24
+  # 定时任务扫描周期（秒）
+  scan-interval-seconds: 30
+
+logging:
+  level:
+    com.platform: INFO
+    org.springframework: WARN
