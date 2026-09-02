@@ -1,5 +1,5 @@
 # ==============================================
-# Node-RED 自定义镜像：官方基座 + 预装第三方节点
+# Node-RED 自定义镜像：官方基座 + 预装第三方节点 + 自动注册 Agent
 # ==============================================
 # 适用场景：现场完全离线，不允许/无法安装节点
 # 节点在构建期烧入镜像，现场零安装、开箱即用
@@ -13,6 +13,11 @@
 # 现场导入并启动：
 #   docker load -i node-red-5.0.4.tar.gz
 #   启动命令见 docs/deploy.md：docker run 命令行显式指定端口/挂载/认证配置
+#
+# 自动注册 Agent（deploy/agent/main.js，零依赖，仅用 Node 内置 http/https）：
+#   默认不启用，不配置 AGENT_* 环境变量时与老镜像行为完全一致；
+#   启用需在 docker run 加环境变量：AGENT_ENABLED=true + AGENT_API_BASE + AGENT_TOKEN，
+#   详见 docs/deploy.md「自动注册机制」章节。
 
 FROM nodered/node-red:5.0.4
 
@@ -41,3 +46,12 @@ RUN npm install --no-audit --no-fund --no-package-lock \
 
 # 其他节点按需求追加，直接加在上面的 npm install 参数列表中（锁定版本）：
 # 例如：node-red-contrib-xxx@x.y.z
+
+# ---------- 自动注册 Agent ----------
+# 零依赖（仅用 Node 内置 http/https），不新增任何 npm 包；保持 node-red 用户权限
+COPY --chown=node-red:node-red agent/ /usr/src/node-red/agent/
+COPY --chown=node-red:node-red agent-entrypoint.sh /usr/src/node-red/agent-entrypoint.sh
+
+# 覆盖入口：先后台启动 agent（注册+心跳），再 exec 官方 entrypoint.sh 启动 node-red
+# 官方 entrypoint.sh（/usr/src/node-red/entrypoint.sh）未被覆盖，官方行为完整保留
+ENTRYPOINT ["bash", "/usr/src/node-red/agent-entrypoint.sh"]
