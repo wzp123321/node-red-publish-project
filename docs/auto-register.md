@@ -67,6 +67,7 @@
 
 - `AGENT_*` 全部来自启动命令的 `-e AGENT_XXX=...`，由**部署人员**填写
 - 其中 `AGENT_TOKEN` 的值由**平台预先生成**（一实例一个），不是脚本自造的
+- `PORT`（Node-RED 监听端口，docker run 时与 `-p` 映射保持一致显式传入，见 deploy.md）：agent 与 node-red 同容器共享环境变量，注册时一并上报给平台；未传时按官方默认 1880 上报
 
 ### 3. 运行时自动获取（Node/系统内置，无需配置）
 
@@ -84,11 +85,11 @@
 
 **Agent → 平台：**
 
-| 方法 | 路径                | 请求体                                                                             | 说明                                                             |
-| ---- | ------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| POST | `/agent/register`   | `{ instanceId, name, ip, platform, arch, nodeVersion, nodeRedVersion, startTime }` | 注册/重新注册（幂等）；HTTP 401 = 凭证无效                       |
-| POST | `/agent/heartbeat`  | `{ instanceId }`                                                                   | 心跳；HTTP 404 或 `code=4001` 表示实例不存在，agent 自动重新注册 |
-| POST | `/agent/deregister` | `{ instanceId }`                                                                   | 主动注销（agent 退出时尽力调用）                                 |
+| 方法 | 路径                | 请求体                                                                                   | 说明                                                             |
+| ---- | ------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| POST | `/agent/register`   | `{ instanceId, name, ip, port, platform, arch, nodeVersion, nodeRedVersion, startTime }` | 注册/重新注册（幂等）；HTTP 401 = 凭证无效                       |
+| POST | `/agent/heartbeat`  | `{ instanceId }`                                                                         | 心跳；HTTP 404 或 `code=4001` 表示实例不存在，agent 自动重新注册 |
+| POST | `/agent/deregister` | `{ instanceId }`                                                                         | 主动注销（agent 退出时尽力调用）                                 |
 
 **管理后台（平台自实现）：**
 

@@ -34,6 +34,8 @@ const HEARTBEAT_INTERVAL = Math.max(
 );
 const REQUEST_TIMEOUT = 8000; // 单次 HTTP 超时
 const INSTANCE_ID_FILE = "/data/.agent-instance-id";
+// Node-RED 监听端口：与 node-red 自身规则一致，读 PORT 环境变量（docker run -e PORT 注入，deploy.md 约定必传），缺省官方默认 1880
+const NODE_RED_PORT = Number(process.env.PORT) || 1880;
 const MAX_RETRY_DELAY = 60 * 1000; // 注册重试退避上限
 
 const API = {
@@ -158,6 +160,7 @@ async function doRegister() {
     instanceId: getInstanceId(),
     name: os.hostname(),
     ip: getLocalIP(),
+    port: NODE_RED_PORT,
     platform: process.platform,
     arch: process.arch,
     nodeVersion: process.version,
@@ -172,6 +175,7 @@ async function doRegister() {
         instanceId: body.instanceId,
         name: body.name,
         ip: body.ip,
+        port: body.port,
       }),
     );
   } else {

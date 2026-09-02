@@ -11,7 +11,7 @@
  *
  * 与官方默认的差异（搜索"⚠ 现场修改"）：
  *   ⚠ credentialSecret  从注释改为启用（与老容器同步）
- *   ⚠ uiPort            1880 → 1890
+ *   ⚠ uiPort            固定 1890 → 由启动命令 -e PORT 指定（未指定回落 1880）
  *   ⚠ adminAuth         从注释改为启用
  *   ⚠ httpNodeAuth      从注释改为启用
  *   ⚠ externalModules   autoInstall: false → true
@@ -110,8 +110,8 @@ module.exports = {
    * - proxyOptions
    ******************************************************************************/
 
-  /** ⚠ 现场修改：端口 1880 → 1890（跟老服务保持一致） */
-  uiPort: 1890,
+  /** ⚠ 现场修改：端口由启动命令 -e PORT 指定（多实例共用本配置文件），未指定时回落官方默认 1880 */
+  uiPort: process.env.PORT || 1880,
 
   // uiHost: "127.0.0.1",  // 官方默认注释（默认监听所有 IPv4 = 0.0.0.0）
 

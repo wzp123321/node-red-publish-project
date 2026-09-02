@@ -24,13 +24,13 @@ deploy/                      # 部署工作目录
 
 **settings/settings.js 内容说明**（完整版见仓库 `deploy/settings/settings.js`，要点如下）：
 
-| 配置项             | 作用                                                            |
-| ------------------ | --------------------------------------------------------------- |
-| `credentialSecret` | 凭据加密密钥，必须与 `flows_cred.json` 成对备份，丢失后无法解密 |
-| `adminAuth`        | 编程页面 `/` 登录认证：`admin` / `3er4#ER$`（完全权限）         |
-| `httpNodeAuth`     | 前端页面 `/dashboard` 浏览器 Basic 认证：`user` / `Nts@1234`    |
-| `uiPort`           | 容器内监听端口，需与 `-p` 端口映射保持一致                      |
-| `externalModules`  | `autoInstall: true` 允许编辑器在线安装节点（仅在线场景需要）    |
+| 配置项             | 作用                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `credentialSecret` | 凭据加密密钥，必须与 `flows_cred.json` 成对备份，丢失后无法解密                                                           |
+| `adminAuth`        | 编程页面 `/` 登录认证：`admin` / `3er4#ER$`（完全权限）                                                                   |
+| `httpNodeAuth`     | 前端页面 `/dashboard` 浏览器 Basic 认证：`user` / `Nts@1234`                                                              |
+| `uiPort`           | `process.env.PORT \|\| 1880`：端口由启动命令 `-e PORT` 指定（多实例可共用同一份 settings.js），需与 `-p` 端口映射保持一致 |
+| `externalModules`  | `autoInstall: true` 允许编辑器在线安装节点（仅在线场景需要）                                                              |
 
 **Dockerfile 内容说明**（完整版见仓库 `deploy/Dockerfile`，方式 A 不参与构建）：
 
@@ -134,9 +134,9 @@ docker logs node-red-custom            # 出现 "Server now running"
 
 > 若容器反复重启，多为数据卷权限问题：`sudo chown -R 1000:1000 ./data/` 后重新启动。
 
-### 2.3.1 仅改外部访问端口
+### 2.3.1 修改访问端口
 
-容器内仍是 1880，只改对外映射（示例改为 1890，`-p` 与 `-e PORT` 需保持一致）：
+改用其他端口时，`-p` 与 `-e PORT` 需保持一致（示例改为 1890；`-e PORT` 未传时容器内回落 1880）：
 
 ```bash
 docker rm -f node-red-custom
