@@ -1,7 +1,6 @@
 package com.platform.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.platform.common.Result;
 import com.platform.entity.InstanceLog;
 import com.platform.mapper.InstanceLogMapper;
@@ -27,10 +26,10 @@ public class InstanceLogController {
     @GetMapping
     public Result<List<InstanceLog>> list(@PathVariable String instanceId,
                                           @RequestParam(defaultValue = "50") Integer limit) {
-        Page<InstanceLog> p = Page.of(1, Math.min(limit, 500));
         LambdaQueryWrapper<InstanceLog> w = new LambdaQueryWrapper<>();
         w.eq(InstanceLog::getInstanceId, instanceId)
-                .orderByDesc(InstanceLog::getCreateTime);
-        return Result.ok(instanceLogMapper.selectPage(p, w).getRecords());
+                .orderByDesc(InstanceLog::getCreateTime)
+                .last("LIMIT " + Math.min(Math.max(limit, 1), 500));
+        return Result.ok(instanceLogMapper.selectList(w));
     }
 }
