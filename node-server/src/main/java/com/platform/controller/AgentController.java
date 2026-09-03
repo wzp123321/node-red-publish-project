@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Agent 调用接口
  *
- * <p>路径前缀 /api/v1（由 application.yml 的 server.servlet.context-path 决定），
- * 完整路径示例：POST /api/v1/agent/register
+ * <p>无统一前缀，完整路径即 POST /agent/register；
+ * 对外访问前缀（如 /zp-api）由 nginx 反向代理配置决定
  */
 @Slf4j
 @RestController

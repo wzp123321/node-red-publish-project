@@ -252,13 +252,13 @@ docker restart node-red
 
 ### 7.2 环境变量
 
-| 变量                       | 必填       | 说明                                                               |
-| -------------------------- | ---------- | ------------------------------------------------------------------ |
-| `AGENT_ENABLED`            | 否         | `true` 启用注册，默认不启用                                        |
-| `AGENT_API_BASE`           | 启用时必填 | 平台 API 基础地址，如 `http://平台IP:8080/api/v1`                  |
-| `AGENT_TOKEN`              | 启用时必填 | **预授权凭证**，平台预生成、一实例一个，防止恶意注册               |
-| `AGENT_INSTANCE_ID`        | 否         | 实例 ID；缺省自动生成并持久化 `/data/.agent-instance-id`，重启不变 |
-| `AGENT_HEARTBEAT_INTERVAL` | 否         | 心跳间隔（秒），默认 30                                            |
+| 变量                       | 必填       | 说明                                                                                                    |
+| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| `AGENT_ENABLED`            | 否         | `true` 启用注册，默认不启用                                                                             |
+| `AGENT_API_BASE`           | 启用时必填 | 平台 API 基础地址，如 `http://平台IP:8080`（经 nginx 代理时含代理前缀，如 `http://平台IP:8899/zp-api`） |
+| `AGENT_TOKEN`              | 启用时必填 | **预授权凭证**，平台预生成、一实例一个，防止恶意注册                                                    |
+| `AGENT_INSTANCE_ID`        | 否         | 实例 ID；缺省自动生成并持久化 `/data/.agent-instance-id`，重启不变                                      |
+| `AGENT_HEARTBEAT_INTERVAL` | 否         | 心跳间隔（秒），默认 30                                                                                 |
 
 > 凭证安全：`AGENT_TOKEN` 通过环境变量传入，不写进镜像与流程文件；平台可随时吊销。
 
@@ -293,7 +293,7 @@ docker run -d --name node-red-custom \
   -e PORT=1890 \
   -e NODE_RED_SETTINGS=/data/settings.js \
   -e AGENT_ENABLED=true \
-  -e AGENT_API_BASE=http://192.168.1.10:8080/api/v1 \
+  -e AGENT_API_BASE=http://192.168.1.10:8080 \
   -e AGENT_TOKEN=xxxxxxxxxxxxxxxx \
   -e AGENT_INSTANCE_ID=zhangjiagang-01 \
   -v $(pwd)/data:/data \

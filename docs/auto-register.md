@@ -42,13 +42,13 @@
 
 ## 二、环境变量
 
-| 变量                       | 必填       | 说明                                                               |
-| -------------------------- | ---------- | ------------------------------------------------------------------ |
-| `AGENT_ENABLED`            | 否         | `true` 启用注册，默认不启用                                        |
-| `AGENT_API_BASE`           | 启用时必填 | 平台 API 基础地址，如 `http://平台IP:8080/api/v1`                  |
-| `AGENT_TOKEN`              | 启用时必填 | **预授权凭证**，平台预生成、一实例一个，防止恶意注册               |
-| `AGENT_INSTANCE_ID`        | 否         | 实例 ID；缺省自动生成并持久化 `/data/.agent-instance-id`，重启不变 |
-| `AGENT_HEARTBEAT_INTERVAL` | 否         | 心跳间隔（秒），默认 30                                            |
+| 变量                       | 必填       | 说明                                                                                                    |
+| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| `AGENT_ENABLED`            | 否         | `true` 启用注册，默认不启用                                                                             |
+| `AGENT_API_BASE`           | 启用时必填 | 平台 API 基础地址，如 `http://平台IP:8080`（经 nginx 代理时含代理前缀，如 `http://平台IP:8899/zp-api`） |
+| `AGENT_TOKEN`              | 启用时必填 | **预授权凭证**，平台预生成、一实例一个，防止恶意注册                                                    |
+| `AGENT_INSTANCE_ID`        | 否         | 实例 ID；缺省自动生成并持久化 `/data/.agent-instance-id`，重启不变                                      |
+| `AGENT_HEARTBEAT_INTERVAL` | 否         | 心跳间隔（秒），默认 30                                                                                 |
 
 > 凭证安全：`AGENT_TOKEN` 通过环境变量传入，不写进镜像与流程文件；平台可随时吊销。
 > 若需长期停用某实例，吊销其 Token 即可阻止重新注册。
@@ -103,7 +103,77 @@
 
 ## 五、注意事项
 
-- **必须重新打镜像**：agent 烧在镜像层，老镜像（含官方镜像）不支持自动注册。
+- **必须重新打镜像**：agent 烧在镜像层，老镜像（含官方镜像）不支持自动注册；修改 `deploy/agent/main.js` 后同样需重新 `docker build` 打镜像才生效。
 - **现场网络**：启用注册要求现场容器能出站访问 `AGENT_API_BASE`（HTTP/HTTPS 出站）。
 - **docker stop 场景**：SIGTERM 只发给 PID 1（node-red），agent 主动注销属尽力而为，平台最终以心跳超时为准。
 - **node-red 编程交互**：本机制只负责实例生命周期管理；如需平台远程下发/查看流程，另走 Node-RED Admin API（配 `adminAuth` Token），两者互不依赖。
+
+## 六、联调排查
+
+### 1. Agent 侧日志（现场容器）
+
+Agent 日志打到容器 stdout，直接查看：
+
+```bash
+docker logs -f node-red-custom | grep agent
+```
+
+| 动作                      | 有无日志 | 内容                                                                                   |
+| ------------------------- | -------- | -------------------------------------------------------------------------------------- |
+| 启动                      | ✅       | `自动注册启动：instanceId=xxx 心跳间隔=30s API=http://...`                             |
+| 未启用/缺配置             | ✅       | `AGENT_ENABLED != true` / `缺少 AGENT_API_BASE`（agent 退出，node-red 正常跑）         |
+| 注册成功                  | ✅       | `注册成功 {"instanceId":...,"name":...,"ip":...,"port":...}`                           |
+| 注册失败                  | ✅       | `注册失败 {"status":...,"error":...,"resp":...}` + `Ns 后重试注册（第 N 次）...`       |
+| 心跳成功（首次/重注册后） | ✅       | `心跳通道确认正常（耗时 xx ms），后续成功心跳不再打印`                                 |
+| 心跳成功（后续）          | ❌ 静默  | 成功心跳不打日志（防刷屏），**看不到心跳日志 ≠ 没在跳**，去平台侧确认                  |
+| 心跳失败                  | ✅       | `心跳失败 {"status":...,"cost":"xx ms"}` / `心跳返回实例不存在/凭证失效，准备重新注册` |
+| 注销                      | ✅       | `注销成功` / `注销失败`                                                                |
+
+> 日志时间戳为容器本地时间（`TZ=Asia/Shanghai`，格式 `yyyy-MM-dd HH:mm:ss`）。
+
+### 2. 平台侧日志（中心服务器 Java 进程）
+
+```bash
+tail -f node-server.log        # nohup 启动时的输出文件
+```
+
+| 日志关键字                              | 含义             |
+| --------------------------------------- | ---------------- |
+| `[register] 新实例/重新注册`            | 收到注册请求     |
+| `[deregister] instanceId=`              | 收到注销请求     |
+| `[agent-auth] token 不存在/已吊销`      | Token 校验失败   |
+| `[heartbeat-check] 标记 N 个实例为离线` | 定时任务判定离线 |
+| `[auto-deregister] 自动注销 N 个实例`   | 定时任务自动注销 |
+
+- MyBatis 已开 SQL 日志，每次心跳的 UPDATE 语句都会打印，可直接确认心跳到达。
+- 也可查库确认：H2 控制台（`http://平台IP:8899/zp-api/h2-console`，JDBC `jdbc:h2:file:./data/nodedb`，用户 `sa` 空密码），看 `t_instance.last_heartbeat_time` 是否每 30s 刷新。
+
+### 3. 分场景排查表（按 Agent `注册失败` 日志中的 status 对号入座）
+
+| 现象                                   | 原因                      | 处理                                                                                                    |
+| -------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| docker logs 里没有 `[agent]`           | 未传 `AGENT_ENABLED=true` | 检查启动命令 `-e` 参数                                                                                  |
+| `status: 0` + ECONNREFUSED / ETIMEDOUT | 现场容器出站不通平台      | 现场服务器 `curl http://平台IP:端口/代理前缀/instances` 测连通性；防火墙/安全组放行                     |
+| `status: 404`                          | 路径拼接错误              | 核对 `AGENT_API_BASE` 是否带 nginx 代理前缀（如 `/zp-api`）；核对 nginx `proxy_pass` 尾斜杠是否剥离前缀 |
+| `status: 401` + code 2001/2002         | Token 不存在/已吊销       | 平台 `GET /tokens` 核对，或重新创建 Token                                                               |
+| `status: 200` + `code: 5000`           | 请求体解析失败            | 看 resp 中的 message 定位是哪个字段                                                                     |
+| 注册成功但实例很快变离线               | 心跳不通或静默失败        | 平台侧看 `t_instance.last_heartbeat_time` 停在哪刻，再看 agent 心跳失败日志                             |
+
+### 4. 联调顺序建议
+
+```bash
+# 1. 现场服务器宿主机上先手动验证整条链路（不经容器）
+curl http://47.116.35.76:8899/zp-api/instances
+
+# 2. 起容器看注册
+docker logs -f node-red-custom        # 等出现 "[agent] 注册成功"
+
+# 3. 平台确认实例出现且 last_heartbeat_time 持续刷新
+curl "http://47.116.35.76:8899/zp-api/instances?status=online"
+```
+
+> 宿主机 curl 通、容器内不通的情况偶有发生（容器 DNS/路由问题）。node-red 镜像内没有 curl，可在容器内用 node 验证：
+
+```bash
+docker exec node-red-custom node -e "fetch('http://47.116.35.76:8899/zp-api/instances').then(r=>r.text()).then(console.log)"
+```

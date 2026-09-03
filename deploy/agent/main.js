@@ -10,7 +10,7 @@
  *
  * 环境变量（未启用时脚本直接退出，不影响 node-red 启动，与老部署完全兼容）：
  *   AGENT_ENABLED               是否启用，默认 false
- *   AGENT_API_BASE              平台 API 基础地址，如 http://192.168.1.10:8080/api/v1
+ *   AGENT_API_BASE              平台 API 基础地址，如 http://192.168.1.10:8080（经 nginx 代理时含代理前缀，如 http://192.168.1.10:8899/zp-api）
  *   AGENT_TOKEN                 预授权凭证（平台预生成，一实例一 Token，防止恶意注册）
  *   AGENT_INSTANCE_ID           实例 ID（可选；缺省自动生成并持久化到 /data/.agent-instance-id，
  *                               容器重启后 ID 不变，重新注册即恢复在线）
@@ -44,12 +44,21 @@ const API = {
   deregister: `${API_BASE}/agent/deregister`,
 };
 
-/* ---------------- 日志 ---------------- */
+/* ---------------- 本地时间格式化（yyyy-MM-dd HH:mm:ss，与平台 @JsonFormat 对齐） ---------------- */
+function fmtLocalTime(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+}
+
+/* ---------------- 日志（本地时间戳，与容器 TZ=Asia/Shanghai 一致） ---------------- */
 function log(...args) {
-  console.log(new Date().toISOString(), "[agent]", ...args);
+  console.log(`[${fmtLocalTime(new Date())}] [agent]`, ...args);
 }
 function warn(...args) {
-  console.warn(new Date().toISOString(), "[agent]", ...args);
+  console.warn(`[${fmtLocalTime(new Date())}] [agent]`, ...args);
 }
 
 /* ---------------- 启动校验 ---------------- */
@@ -155,6 +164,9 @@ async function call(method, pathKey, body) {
 }
 
 /* ---------------- 注册 / 心跳 / 注销 ---------------- */
+// 首次心跳成功打一条确认日志，后续成功心跳静默（防刷屏）；失败/重注册后仍会提示
+let heartbeatConfirmed = false;
+
 async function doRegister() {
   const body = {
     instanceId: getInstanceId(),
@@ -165,7 +177,7 @@ async function doRegister() {
     arch: process.arch,
     nodeVersion: process.version,
     nodeRedVersion: process.env.NODE_RED_VERSION || "unknown",
-    startTime: new Date().toISOString(),
+    startTime: fmtLocalTime(new Date()),
   };
   const r = await call("POST", "register", body);
   if (r.ok) {
@@ -189,8 +201,16 @@ async function doRegister() {
 
 async function doHeartbeat() {
   const instanceId = getInstanceId();
+  const t0 = Date.now();
   const r = await call("POST", "heartbeat", { instanceId });
-  if (r.ok) return { needReRegister: false };
+  const cost = Date.now() - t0;
+  if (r.ok) {
+    if (!heartbeatConfirmed) {
+      heartbeatConfirmed = true;
+      log(`心跳通道确认正常（耗时 ${cost}ms），后续成功心跳不再打印`);
+    }
+    return { needReRegister: false };
+  }
   // 401/403：凭证失效；404/4001：实例已被注销 —— 都需重新注册
   const needReRegister =
     r.status === 401 || r.status === 404 || (r.json && r.json.code === 4001);
@@ -202,7 +222,12 @@ async function doHeartbeat() {
   } else {
     warn(
       "心跳失败",
-      JSON.stringify({ status: r.status, error: r.error, resp: r.json }),
+      JSON.stringify({
+        status: r.status,
+        error: r.error,
+        resp: r.json,
+        cost: `${cost}ms`,
+      }),
     );
   }
   return { needReRegister };
@@ -239,11 +264,13 @@ async function run() {
       // 指数退避：5s → 10s → 20s → 40s → 60s（封顶）
       const delay = Math.min(MAX_RETRY_DELAY, 5000 * Math.pow(2, retry));
       retry = Math.min(retry + 1, 6);
+      warn(`${Math.round(delay / 1000)}s 后重试注册（第 ${retry} 次）...`);
       await sleep(delay);
       continue;
     }
     const r = await doHeartbeat();
     if (r.needReRegister) {
+      heartbeatConfirmed = false; // 重注册后重新确认心跳通道
       registered = false;
       continue;
     }
