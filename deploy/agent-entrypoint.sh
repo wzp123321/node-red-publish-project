@@ -7,6 +7,8 @@
 #      npm start、信号转发等），agent 与 node-red 进程相互独立
 # 说明：
 #   - 不覆盖官方 /usr/src/node-red/entrypoint.sh，仅在此脚本末尾 exec 它
+#   - 镜像内 CMD 为 `--settings /usr/src/node-red/settings.js`，由 `"$@"` 原样透传给
+#     官方入口，node-red 因此始终加载镜像内出厂 settings.js（详见 Dockerfile）
 #   - 本脚本必须以 bash 执行（官方基础镜像 debian-slim 自带 bash）
 #   - docker stop 时 SIGTERM 只会发给 PID 1（node-red），agent 的优雅注销
 #     属"尽力而为"；平台侧离线/注销主要依赖心跳超时检测

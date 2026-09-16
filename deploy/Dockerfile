@@ -12,7 +12,8 @@
 #
 # 现场导入并启动：
 #   docker load -i node-red-5.0.4.tar.gz
-#   启动命令见 docs/deploy.md：docker run 命令行显式指定端口/挂载/认证配置
+#   启动命令见 docs/deploy.md：只需挂载数据卷 /data + 指定端口；
+#   settings.js 已烧入镜像，启动时由 CMD 的 --settings 直接加载，无需挂载
 #
 # 自动注册 Agent（deploy/agent/main.js，零依赖，仅用 Node 内置 http/https）：
 #   容器启动即拉起 agent；未配置 AGENT_API_BASE 时 agent 立即退出，与老镜像行为一致。
@@ -52,6 +53,25 @@ RUN npm install --no-audit --no-fund --no-package-lock \
 COPY --chown=node-red:node-red agent/ /usr/src/node-red/agent/
 COPY --chown=node-red:node-red agent-entrypoint.sh /usr/src/node-red/agent-entrypoint.sh
 
+# ---------- 出厂 settings.js（烧入镜像，启动默认加载）----------
+# 刻意放在 /data 之外：/data 是运行时 userDir，docker run 时通常被
+# `-v $(pwd)/data:/data` 挂载遮蔽，镜像内 /data 的内容会整体不可见。
+#
+# 启动时由下方 CMD 传 --settings 绝对路径加载，完整执行链路：
+#   agent-entrypoint.sh → 官方 entrypoint.sh →
+#   node node_modules/node-red/red.js --userDir /data flows.json --settings /usr/src/node-red/settings.js
+#
+# red.js 命中 `--settings` 分支后即固定使用该文件：不再去 /data 找 settings.js，
+# 也不会在缺失时往 /data 复制一份默认配置——历史上前者导致认证不生效、
+# 后者（宿主机目录属主非 1000 时）直接 EACCES 导致容器反复重启，此处一并规避。
+# 数据卷 /data 只承担 flows/凭据等运行时数据的持久化。
+COPY --chown=node-red:node-red settings/settings.js /usr/src/node-red/settings.js
+
 # 覆盖入口：先后台启动 agent（注册+心跳），再 exec 官方 entrypoint.sh 启动 node-red
 # 官方 entrypoint.sh（/usr/src/node-red/entrypoint.sh）未被覆盖，官方行为完整保留
 ENTRYPOINT ["bash", "/usr/src/node-red/agent-entrypoint.sh"]
+
+# 传给官方 entrypoint，由其透传给 red.js：始终加载镜像内出厂 settings.js。
+# 现场需临时换配置（不改镜像）时，在 docker run 末尾覆盖即可，如：
+#   docker run ... node-red-custom:5.0.4 --settings /tmp/settings.js
+CMD ["--settings", "/usr/src/node-red/settings.js"]
