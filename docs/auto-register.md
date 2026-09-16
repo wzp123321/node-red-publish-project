@@ -18,15 +18,15 @@
 ### 2. 现场部署阶段（现场，离线）
 
 1. `docker load -i node-red-custom-5.0.4.tar.gz` 导入镜像
-2. `docker run` 启动，**显式加 3 个环境变量启用注册**（见下表）
-3. 不加 `AGENT_*` 环境变量 → agent 启动即退出，行为与老镜像完全一致，现有部署命令无需改动
+2. `docker run` 启动，**显式加 `AGENT_API_BASE` 环境变量启用注册**（见下表）
+3. 不加 `AGENT_API_BASE` → agent 启动即退出，行为与老镜像完全一致，现有部署命令无需改动
 
 ### 3. 容器启动后（agent 自动执行）
 
 1. 入口脚本后台拉起 agent，随后 exec 官方入口启动 node-red（两进程相互独立）
-2. agent 携带预授权凭证调 `POST /agent/register` → 注册成功 → 平台记录 **在线/未绑定**
+2. agent 调 `POST /tenant/nodeRed/register` → 注册成功 → 平台记录 **在线/未绑定**
    - 注册失败：指数退避重试（5s → 60s 封顶），**不阻塞** node-red 启动
-3. 注册成功后每 30s 发一次心跳 `POST /agent/heartbeat`，平台刷新最后心跳时间
+3. 注册成功后每 30s 发一次心跳 `POST /tenant/nodeRed/heartbeat`，平台刷新最后心跳时间
 
 ### 4. 运行期状态流转（平台侧负责）
 
@@ -42,16 +42,11 @@
 
 ## 二、环境变量
 
-| 变量                       | 必填       | 说明                                                                                                    |
-| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
-| `AGENT_ENABLED`            | 否         | `true` 启用注册，默认不启用                                                                             |
-| `AGENT_API_BASE`           | 启用时必填 | 平台 API 基础地址，如 `http://平台IP:8080`（经 nginx 代理时含代理前缀，如 `http://平台IP:8899/zp-api`） |
-| `AGENT_TOKEN`              | 启用时必填 | **预授权凭证**，平台预生成、一实例一个，防止恶意注册                                                    |
-| `AGENT_INSTANCE_ID`        | 否         | 实例 ID；缺省自动生成并持久化 `/data/.agent-instance-id`，重启不变                                      |
-| `AGENT_HEARTBEAT_INTERVAL` | 否         | 心跳间隔（秒），默认 30                                                                                 |
-
-> 凭证安全：`AGENT_TOKEN` 通过环境变量传入，不写进镜像与流程文件；平台可随时吊销。
-> 若需长期停用某实例，吊销其 Token 即可阻止重新注册。
+| 变量                       | 必填 | 说明                                                                                                    |
+| -------------------------- | ---- | ------------------------------------------------------------------------------------------------------- |
+| `AGENT_API_BASE`           | 是   | 平台 API 基础地址，如 `http://平台IP:8080`（经 nginx 代理时含代理前缀，如 `http://平台IP:8899/zp-api`） |
+| `PORT`                     | 否   | Node-RED 监听端口，同时作为实例 ID 后缀 `nodered-${PORT}`（缺省 1880）                                  |
+| `AGENT_HEARTBEAT_INTERVAL` | 否   | 心跳间隔（秒），默认 30                                                                                 |
 
 ## 三、路径与变量来源
 
@@ -61,35 +56,22 @@
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `/usr/src/node-red/agent`         | 官方镜像工作目录为 `/usr/src/node-red`，Dockerfile `COPY agent/ /usr/src/node-red/agent/` 将 agent 拷入 |
 | `/usr/src/node-red/entrypoint.sh` | 官方镜像**自带**入口脚本，agent-entrypoint.sh 末尾 `exec` 它来正常启动 node-red                         |
-| `/data/.agent-instance-id`        | `/data` 是官方镜像声明的数据卷，现场 `-v $(pwd)/data:/data` 挂到宿主机；实例 ID 持久化于此，重启不变    |
 
 ### 2. 环境变量（docker run 时注入）
 
-- `AGENT_*` 全部来自启动命令的 `-e AGENT_XXX=...`，由**部署人员**填写
-- 其中 `AGENT_TOKEN` 的值由**平台预先生成**（一实例一个），不是脚本自造的
-- `PORT`（Node-RED 监听端口，docker run 时与 `-p` 映射保持一致显式传入，见 deploy.md）：agent 与 node-red 同容器共享环境变量，注册时一并上报给平台；未传时按官方默认 1880 上报
-
-### 3. 运行时自动获取（Node/系统内置，无需配置）
-
-| 值                                                      | 来源                                                    |
-| ------------------------------------------------------- | ------------------------------------------------------- |
-| `NODE_RED_VERSION`                                      | 官方镜像预置的环境变量（`ENV NODE_RED_VERSION=v5.0.4`） |
-| 容器主机名（`os.hostname()`）                           | Node 内置 os 模块读取                                   |
-| 本机 IP（`os.networkInterfaces()`）                     | Node 读取容器网卡                                       |
-| `process.platform` / `process.arch` / `process.version` | Node 运行时自身信息                                     |
+- `AGENT_API_BASE` 来自启动命令的 `-e AGENT_API_BASE=...`，由**部署人员**填写
+- `PORT`（Node-RED 监听端口，docker run 时与 `-p` 映射保持一致显式传入，见 deploy.md）：agent 与 node-red 同容器共享环境变量；同时作为实例 ID 后缀（`nodered-${PORT}`）上报给平台；未传时按官方默认 1880
 
 ## 四、平台接口
 
-统一请求头：`Authorization: Bearer <AGENT_TOKEN>`；
 统一响应：`{ "code": 0, "message": "ok", "data": {...} }`，`code != 0` 为业务失败。
 
 **Agent → 平台：**
 
-| 方法 | 路径                | 请求体                                                                                   | 说明                                                             |
-| ---- | ------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| POST | `/agent/register`   | `{ instanceId, name, ip, port, platform, arch, nodeVersion, nodeRedVersion, startTime }` | 注册/重新注册（幂等）；HTTP 401 = 凭证无效                       |
-| POST | `/agent/heartbeat`  | `{ instanceId }`                                                                         | 心跳；HTTP 404 或 `code=4001` 表示实例不存在，agent 自动重新注册 |
-| POST | `/agent/deregister` | `{ instanceId }`                                                                         | 主动注销（agent 退出时尽力调用）                                 |
+| 方法 | 路径                        | 请求体                     | 说明                                                             |
+| ---- | --------------------------- | -------------------------- | ---------------------------------------------------------------- |
+| POST | `/tenant/nodeRed/register`  | `{ instanceId, ip, port }` | 注册/重新注册（幂等）                                            |
+| POST | `/tenant/nodeRed/heartbeat` | `{ instanceId }`           | 心跳；HTTP 404 或 `code=4001` 表示实例不存在，agent 自动重新注册 |
 
 **管理后台（平台自实现）：**
 
@@ -118,16 +100,15 @@ Agent 日志打到容器 stdout，直接查看：
 docker logs -f node-red-custom | grep agent
 ```
 
-| 动作                      | 有无日志 | 内容                                                                                   |
-| ------------------------- | -------- | -------------------------------------------------------------------------------------- |
-| 启动                      | ✅       | `自动注册启动：instanceId=xxx 心跳间隔=30s API=http://...`                             |
-| 未启用/缺配置             | ✅       | `AGENT_ENABLED != true` / `缺少 AGENT_API_BASE`（agent 退出，node-red 正常跑）         |
-| 注册成功                  | ✅       | `注册成功 {"instanceId":...,"name":...,"ip":...,"port":...}`                           |
-| 注册失败                  | ✅       | `注册失败 {"status":...,"error":...,"resp":...}` + `Ns 后重试注册（第 N 次）...`       |
-| 心跳成功（首次/重注册后） | ✅       | `心跳通道确认正常（耗时 xx ms），后续成功心跳不再打印`                                 |
-| 心跳成功（后续）          | ❌ 静默  | 成功心跳不打日志（防刷屏），**看不到心跳日志 ≠ 没在跳**，去平台侧确认                  |
-| 心跳失败                  | ✅       | `心跳失败 {"status":...,"cost":"xx ms"}` / `心跳返回实例不存在/凭证失效，准备重新注册` |
-| 注销                      | ✅       | `注销成功` / `注销失败`                                                                |
+| 动作                        | 有无日志 | 内容                                                                             |
+| --------------------------- | -------- | -------------------------------------------------------------------------------- |
+| 启动                        | ✅       | `自动注册启动：instanceId=xxx 心跳间隔=30s API=http://...`                       |
+| 缺配置（无 AGENT_API_BASE） | ✅       | `缺少 AGENT_API_BASE`（agent 退出，node-red 正常跑）                             |
+| 注册成功                    | ✅       | `注册成功 {"instanceId":...,"ip":...,"port":...}`                                |
+| 注册失败                    | ✅       | `注册失败 {"status":...,"error":...,"resp":...}` + `Ns 后重试注册（第 N 次）...` |
+| 心跳成功（首次/重注册后）   | ✅       | `心跳通道确认正常（耗时 xx ms），后续成功心跳不再打印`                           |
+| 心跳成功（后续）            | ❌ 静默  | 成功心跳不打日志（防刷屏），**看不到心跳日志 ≠ 没在跳**，去平台侧确认            |
+| 心跳失败                    | ✅       | `心跳失败 {"status":...,"cost":"xx ms"}` / `心跳返回实例不存在，准备重新注册`    |
 
 > 日志时间戳为容器本地时间（`TZ=Asia/Shanghai`，格式 `yyyy-MM-dd HH:mm:ss`）。
 
@@ -141,7 +122,6 @@ tail -f node-server.log        # nohup 启动时的输出文件
 | --------------------------------------- | ---------------- |
 | `[register] 新实例/重新注册`            | 收到注册请求     |
 | `[deregister] instanceId=`              | 收到注销请求     |
-| `[agent-auth] token 不存在/已吊销`      | Token 校验失败   |
 | `[heartbeat-check] 标记 N 个实例为离线` | 定时任务判定离线 |
 | `[auto-deregister] 自动注销 N 个实例`   | 定时任务自动注销 |
 
@@ -150,14 +130,14 @@ tail -f node-server.log        # nohup 启动时的输出文件
 
 ### 3. 分场景排查表（按 Agent `注册失败` 日志中的 status 对号入座）
 
-| 现象                                   | 原因                      | 处理                                                                                                    |
-| -------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| docker logs 里没有 `[agent]`           | 未传 `AGENT_ENABLED=true` | 检查启动命令 `-e` 参数                                                                                  |
-| `status: 0` + ECONNREFUSED / ETIMEDOUT | 现场容器出站不通平台      | 现场服务器 `curl http://平台IP:端口/代理前缀/instances` 测连通性；防火墙/安全组放行                     |
-| `status: 404`                          | 路径拼接错误              | 核对 `AGENT_API_BASE` 是否带 nginx 代理前缀（如 `/zp-api`）；核对 nginx `proxy_pass` 尾斜杠是否剥离前缀 |
-| `status: 401` + code 2001/2002         | Token 不存在/已吊销       | 平台 `GET /tokens` 核对，或重新创建 Token                                                               |
-| `status: 200` + `code: 5000`           | 请求体解析失败            | 看 resp 中的 message 定位是哪个字段                                                                     |
-| 注册成功但实例很快变离线               | 心跳不通或静默失败        | 平台侧看 `t_instance.last_heartbeat_time` 停在哪刻，再看 agent 心跳失败日志                             |
+| 现象                                   | 原因                  | 处理                                                                                                    |
+| -------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| docker logs 里没有 `[agent]`           | 未传 `AGENT_API_BASE` | 检查启动命令 `-e AGENT_API_BASE=...`                                                                    |
+| `status: 0` + ECONNREFUSED / ETIMEDOUT | 现场容器出站不通平台  | 现场服务器 `curl http://平台IP:端口/代理前缀/instances` 测连通性；防火墙/安全组放行                     |
+| `status: 404`                          | 路径拼接错误          | 核对 `AGENT_API_BASE` 是否带 nginx 代理前缀（如 `/zp-api`）；核对 nginx `proxy_pass` 尾斜杠是否剥离前缀 |
+| `status: 401/403`                      | 平台侧访问控制拒绝    | 联系平台运维核对 IP 白名单 / nginx 鉴权策略                                                             |
+| `status: 200` + `code: 5000`           | 请求体解析失败        | 看 resp 中的 message 定位是哪个字段                                                                     |
+| 注册成功但实例很快变离线               | 心跳不通或静默失败    | 平台侧看 `t_instance.last_heartbeat_time` 停在哪刻，再看 agent 心跳失败日志                             |
 
 ### 4. 联调顺序建议
 

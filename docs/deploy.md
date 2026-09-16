@@ -227,11 +227,11 @@ docker restart node-red
 
 ---
 
-## 七、自动注册机制（可选，集中管理场景）
+## 七、自动注册机制（集中管理场景）
 
 > 适用场景：多现场 node-red 实例统一注册到中心平台，实现集中状态监测
-> （在线/离线、已绑定/未绑定）与实例生命周期管理。**默认不启用**，未配置
-> `AGENT_*` 环境变量时行为与老镜像完全一致。
+> （在线/离线、已绑定/未绑定）与实例生命周期管理。未传 `AGENT_API_BASE`
+> 时 agent 启动即退出，行为与老镜像完全一致。
 
 ### 7.1 架构与状态机
 
@@ -248,30 +248,67 @@ docker restart node-red
                                 平台手动注销 ───────────────▶ 已注销
 ```
 
-- 实例重启/断网重连：重新注册（幂等，同一 instanceId + Token）即自动恢复在线。
+- 实例重启/断网重连：重新注册（幂等，同一 instanceId）即自动恢复在线。
 
 ### 7.2 环境变量
 
-| 变量                       | 必填       | 说明                                                                                                    |
-| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
-| `AGENT_ENABLED`            | 否         | `true` 启用注册，默认不启用                                                                             |
-| `AGENT_API_BASE`           | 启用时必填 | 平台 API 基础地址，如 `http://平台IP:8080`（经 nginx 代理时含代理前缀，如 `http://平台IP:8899/zp-api`） |
-| `AGENT_TOKEN`              | 启用时必填 | **预授权凭证**，平台预生成、一实例一个，防止恶意注册                                                    |
-| `AGENT_INSTANCE_ID`        | 否         | 实例 ID；缺省自动生成并持久化 `/data/.agent-instance-id`，重启不变                                      |
-| `AGENT_HEARTBEAT_INTERVAL` | 否         | 心跳间隔（秒），默认 30                                                                                 |
+| 变量                       | 必填                   | 默认值     | 说明                                                                                                                                                       |
+| -------------------------- | ---------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AGENT_API_BASE`           | **启用自动注册时必填** | 无         | 平台 API 基础地址，如 `http://平台IP:8080`（经 nginx 代理时含代理前缀，如 `http://平台IP:8899/zp-api`）。**不传则 agent 启动即退出**，行为与老镜像完全一致 |
+| `AGENT_HEARTBEAT_INTERVAL` | 否                     | `60`（秒） | agent 上报心跳的轮询间隔，整数秒，≥1。传 100 就是 100 秒，依此类推；传 `0` 或空串走默认；含小数非整数部分被 `Number()` 截断为整数                          |
+| `PORT`                     | 否                     | `1880`     | Node-RED 监听端口，同时作为实例 ID 后缀 `nodered-${PORT}`（实例 ID = `Node-RED-${PORT}`）。需与 `-p` 端口映射保持一致                                      |
 
-> 凭证安全：`AGENT_TOKEN` 通过环境变量传入，不写进镜像与流程文件；平台可随时吊销。
+#### 7.2.1 启动传参示例
+
+启用自动注册（标准场景）：
+
+```bash
+docker run -d --name node-red-custom \
+  -p 1888:1888 \
+  -e TZ=Asia/Shanghai \
+  -e PORT=1888 \
+  -e AGENT_API_BASE=http://192.168.41.198:8200 \
+  --restart unless-stopped \
+  node-red-custom:5.0.4
+```
+
+启用注册 + 自定义心跳间隔（100 秒）：
+
+```bash
+docker run -d --name node-red-custom \
+  -p 1888:1888 \
+  -e TZ=Asia/Shanghai \
+  -e PORT=1888 \
+  -e AGENT_API_BASE=http://192.168.41.198:8200 \
+  -e AGENT_HEARTBEAT_INTERVAL=100 \
+  --restart unless-stopped \
+  node-red-custom:5.0.4
+```
+
+不启用注册（与老镜像一致，纯本地运行）：
+
+```bash
+docker run -d --name node-red-custom \
+  -p 1888:1888 \
+  -e TZ=Asia/Shanghai \
+  -e PORT=1888 \
+  --restart unless-stopped \
+  node-red-custom:5.0.4
+```
+
+**验证日志**：`docker logs -f node-red-custom`
+
+- 启用时见：`[agent] 自动注册启动：instanceId=Node-RED-1888 心跳间隔=60s API=http://...`
+- 未启用则**完全没有** `[agent]` 相关行（agent 检测到缺 `AGENT_API_BASE` 后立即退出）
 
 ### 7.3 平台接口规范（Agent → 平台）
 
-统一请求头：`Authorization: Bearer <AGENT_TOKEN>`；
 统一响应：`{ "code": 0, "message": "ok", "data": {...} }`，`code != 0` 为业务失败。
 
-| 方法 | 路径                | 请求体                                                                             | 说明                                                             |
-| ---- | ------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| POST | `/agent/register`   | `{ instanceId, name, ip, platform, arch, nodeVersion, nodeRedVersion, startTime }` | 注册/重新注册（幂等）；HTTP 401 = 凭证无效                       |
-| POST | `/agent/heartbeat`  | `{ instanceId }`                                                                   | 心跳；HTTP 404 或 `code=4001` 表示实例不存在，Agent 自动重新注册 |
-| POST | `/agent/deregister` | `{ instanceId }`                                                                   | 主动注销（Agent 退出时尽力调用）                                 |
+| 方法 | 路径                        | 请求体                     | 说明                                                             |
+| ---- | --------------------------- | -------------------------- | ---------------------------------------------------------------- |
+| POST | `/tenant/nodeRed/register`  | `{ instanceId, ip, port }` | 注册/重新注册（幂等）                                            |
+| POST | `/tenant/nodeRed/heartbeat` | `{ instanceId }`           | 心跳；HTTP 404 或 `code=4001` 表示实例不存在，Agent 自动重新注册 |
 
 ### 7.4 平台管理接口（管理后台自实现）
 
@@ -292,10 +329,8 @@ docker run -d --name node-red-custom \
   -e TZ=Asia/Shanghai \
   -e PORT=1890 \
   -e NODE_RED_SETTINGS=/data/settings.js \
-  -e AGENT_ENABLED=true \
   -e AGENT_API_BASE=http://192.168.1.10:8080 \
-  -e AGENT_TOKEN=xxxxxxxxxxxxxxxx \
-  -e AGENT_INSTANCE_ID=zhangjiagang-01 \
+  -e AGENT_HEARTBEAT_INTERVAL=60 \
   -v $(pwd)/data:/data \
   -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
@@ -306,9 +341,9 @@ docker run -d --name node-red-custom \
 
 ### 7.6 影响与注意事项
 
-- **镜像变更**：自动注册依赖新镜像（agent 已烧入镜像层），老镜像不支持；未配置 `AGENT_*` 时**现有部署命令无需改动**。
+- **镜像变更**：自动注册依赖新镜像（agent 已烧入镜像层），老镜像不支持；未传 `AGENT_API_BASE` 时行为与老镜像一致，现有部署命令无需改动。
 - **现场网络**：启用注册要求现场容器能出站访问 `AGENT_API_BASE`（HTTP/HTTPS 出站）。
-- **手动注销后**：Agent 下一次心跳收到 404/4001 会自动重新注册；若需长期停用请吊销对应 `AGENT_TOKEN`。
+- **手动注销后**：Agent 下一次心跳收到 404/4001 会自动重新注册；若需长期停用，在平台管理后台手动删除该实例即可。
 - **docker stop 场景**：SIGTERM 只发给 PID 1（node-red），Agent 主动注销是尽力而为，平台侧最终以心跳超时为准。
 - **node-red 编程交互**：本机制只负责实例生命周期管理；如需平台远程下发/查看流程，另走 Node-RED Admin API（配 `adminAuth` Token），两者互不依赖。
 

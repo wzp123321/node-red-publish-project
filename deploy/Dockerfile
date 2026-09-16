@@ -15,8 +15,8 @@
 #   启动命令见 docs/deploy.md：docker run 命令行显式指定端口/挂载/认证配置
 #
 # 自动注册 Agent（deploy/agent/main.js，零依赖，仅用 Node 内置 http/https）：
-#   默认不启用，不配置 AGENT_* 环境变量时与老镜像行为完全一致；
-#   启用需在 docker run 加环境变量：AGENT_ENABLED=true + AGENT_API_BASE + AGENT_TOKEN，
+#   容器启动即拉起 agent；未配置 AGENT_API_BASE 时 agent 立即退出，与老镜像行为一致。
+#   需要注册时在 docker run 加环境变量 AGENT_API_BASE（可选 AGENT_HEARTBEAT_INTERVAL），
 #   详见 docs/deploy.md「自动注册机制」章节。
 
 FROM nodered/node-red:5.0.4

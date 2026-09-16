@@ -2,7 +2,7 @@
 # ============================================================
 # Node-RED 容器启动入口（自动注册 Agent 版本）
 # 职责：
-#   1. 后台启动注册/心跳 agent（main.js，AGENT_ENABLED=false 时立即退出，无副作用）
+#   1. 后台启动注册/心跳 agent（main.js，未配置 AGENT_API_BASE 时立即退出，无副作用）
 #   2. exec 官方 entrypoint.sh，完整保留官方启动行为（settings 加载、safe mode、
 #      npm start、信号转发等），agent 与 node-red 进程相互独立
 # 说明：
