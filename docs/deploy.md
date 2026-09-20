@@ -27,13 +27,13 @@ deploy/                      # 部署工作目录
 
 **settings/settings.js 内容说明**（完整版见仓库 `deploy/settings/settings.js`，要点如下）：
 
-| 配置项             | 作用                                                                                                                      |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 配置项             | 作用                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `credentialSecret` | 凭据加密密钥。当前为注释状态（未显式设置），由 node-red 首次启动自动生成并存入 `/data/.config.runtime.json`，故备份 `./data` 即可（见 4.2） |
-| `adminAuth`        | 编程页面 `/` 登录认证：`admin` / `3er4#ER$`（完全权限）                                                                   |
-| `httpNodeAuth`     | 前端页面 `/dashboard` 浏览器 Basic 认证：`user` / `Nts@1234`                                                              |
-| `uiPort`           | `process.env.PORT \|\| 1880`：端口由启动命令 `-e PORT` 指定（多实例可共用同一份 settings.js），需与 `-p` 端口映射保持一致 |
-| `externalModules`  | `autoInstall: true` 允许编辑器在线安装节点（仅在线场景需要）                                                              |
+| `adminAuth`        | 编程页面 `/` 登录认证：`admin` / `3er4#ER$`（完全权限）                                                                                     |
+| `httpNodeAuth`     | 前端页面 `/dashboard` 浏览器 Basic 认证：`user` / `Nts@1234`                                                                                |
+| `uiPort`           | `process.env.PORT \|\| 1880`：端口由启动命令 `-e PORT` 指定（多实例可共用同一份 settings.js），需与 `-p` 端口映射保持一致                   |
+| `externalModules`  | `autoInstall: true` 允许编辑器在线安装节点（仅在线场景需要）                                                                                |
 
 **Dockerfile 内容说明**（完整版见仓库 `deploy/Dockerfile`，方式 A 不参与构建）：
 
@@ -85,13 +85,9 @@ cd deploy
 docker build -t node-red-custom:5.0.4 .
 
 # 2. （可选）先验证一次：启动 → 浏览器确认登录页和节点 → 停止
-docker run -d --name node-red-custom \
-  -p 1880:1880 \
-  -e TZ=Asia/Shanghai \
-  -e PORT=1880 \
-  -v $(pwd)/data:/data \
-  --restart unless-stopped \
-  node-red-custom:5.0.4
+# 需要指定域名nginxIn.tshlms.com
+docker run -d --name node-red-custom-1881 -p 1881:1881 --add-host nginxIn.tshlms.com:192.168.50.177  -e TZ=Asia/Shanghai  -e PORT=1881  -v $(pwd)/data-1881:/data   --restart unless-stopped  node-red-custom:5.0.4
+
 docker stop node-red-custom && docker rm node-red-custom
 
 # 3. 导出离线包
