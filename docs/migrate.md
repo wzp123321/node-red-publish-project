@@ -26,9 +26,11 @@ docker exec energy-nodered-hvac-0 grep credentialSecret /data/settings.js
 # 2) 改新服务的 settings.js（跟老服务一致）
 #    路径：/deploy/settings/settings.js
 #    找到 credentialSecret 行，替换成老服务的值
+#    settings.js 已烧入镜像，改完必须重新 docker build 并重新交付才生效，
+#    只改宿主机上的文件、或 docker restart 都不会生效（见 docs/deploy.md 第八章）
 ```
 
-> 为什么要先改？settings.js 在容器启动时读取，复制 `flows_cred.json` 之后 secret 不一致就报错了。
+> 为什么要先改？settings.js 在**镜像构建期**烧入，容器启动时由镜像 CMD 的 `--settings` 加载；复制 `flows_cred.json` 之后 secret 不一致就报错了。
 
 **无 credentialSecret 时的迁移命令**：
 
@@ -191,17 +193,15 @@ v3 的 `ui-template` 走 Vue 3，不接 AngularJS 语法；**没有 1:1 替代�
 # 手动部署（转换 + 人工处理完后再复制）
 cp /deploy/old-node-red-data/flows.v2.json /deploy/data/flows.json
 
-# 启动（docker run 命令行显式指定挂载/端口/认证配置）
+# 启动（settings.js 已烧入镜像、由镜像 CMD 的 --settings 加载，无需挂载、无需设环境变量）
 cd /deploy
 docker run -d --name energy-nodered-custom \
   -p 1890:1890 \
   -e TZ=Asia/Shanghai \
   -e PORT=1890 \
-  -e NODE_RED_SETTINGS=/data/settings.js \
   -v $(pwd)/data:/data \
-  -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 
 # 看启动日志
 docker logs -f energy-nodered-custom 2>&1 | grep "Server now running"
@@ -235,6 +235,7 @@ docker restart energy-nodered-custom
 
 1. 拿老服务的 secret：`docker exec energy-nodered-hvac-0 grep credentialSecret /data/settings.js`
 2. 改 `/deploy/settings/settings.js` 的 `credentialSecret` 字段
-3. 重启：`docker restart energy-nodered-custom`
+3. **重新构建镜像并重新交付**：`docker build -t harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 .` → `docker rm -f energy-nodered-custom` → 按 3.4 重新启动（`./data` 不动）。
+   > settings.js 已烧入镜像，`docker restart` 或只改宿主机文件**都不会**让新 secret 生效。
 
 **预防**：迁移前先做 [第 1 步](#1-同步-credentialsecret动手前必做)。

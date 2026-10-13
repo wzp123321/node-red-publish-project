@@ -49,16 +49,23 @@ agent-entrypoint.sh（后台拉起 agent）→ 官方 /usr/src/node-red/entrypoi
 
 ```bash
 cd deploy
-docker build -t energy-nodered-custom .
+docker build -t harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 .
 
 # 可选：本机先验证一次（浏览器确认登录页与节点），随后删除
 docker run -d --name node-red-test -p 1880:1880 -e PORT=1880 -e TZ=Asia/Shanghai \
-  -v $(pwd)/data-test:/data --restart unless-stopped energy-nodered-custom
+  -v $(pwd)/data-test:/data --restart unless-stopped \
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 docker rm -f node-red-test
 
-# 导出离线包
-docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
+# 导出离线包（save 保留完整 tag，现场 load 后按同名启动即可）
+docker save harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 \
+  | gzip > energy-nodered-custom.tar.gz
+
+# 或者推送到 Harbor，现场 docker login 后 pull（二选一）
+docker push harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 ```
+
+> 镜像名固定为 `harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0`，tag 由上面 `docker build -t` 决定；发布新版本时改 tag，并同步本章及第三、五章的启动命令。
 
 **镜像内预装节点**（Dockerfile 内一次 `npm install`，版本锁定）：
 
@@ -76,7 +83,7 @@ docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
 ## 三、现场部署（离线）
 
 ```bash
-# 1. 导入镜像
+# 1. 导入镜像（走 Harbor 时改为 docker login + docker pull，见第二章）
 docker load -i energy-nodered-custom.tar.gz
 
 # 2. 准备数据目录并授权（权限不对容器会反复重启）
@@ -94,7 +101,7 @@ docker run -d --name energy-nodered-custom \
   --add-host nginxin.tshlms.com:192.168.50.177 \
   -v $(pwd)/data:/data \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 
 # 5. 验证
 docker ps | grep energy-nodered-custom                     # 状态 Up
@@ -112,7 +119,8 @@ docker logs energy-nodered-custom | grep "Settings file"   # /usr/src/node-red/s
 | `--add-host nginxIn.tshlms.com:<内网IP>` | 域名映射，**实例注册必须**；大小写两个域名都要加（见下）                  |
 | `-v $(pwd)/data:/data`                   | 数据卷，flows/凭据/密钥持久化（每实例一个独立目录）                       |
 | `--restart unless-stopped`               | 随 Docker 自启、异常退出自动重启                                          |
-| `energy-nodered-custom`            | 镜像名:标签                                                               |
+
+镜像引用固定为 `harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0`（tag 由 `docker build -t` 决定，见第二章）。
 
 **多实例（一台机器跑多个 node-red）**：每个实例用独立的容器名、端口、数据目录，目录都要读写权限；不能共用（flows.json 会互相覆盖）。
 
@@ -121,11 +129,13 @@ mkdir -p data-1880 data-1888 && sudo chown -R 1000:1000 data-1880 data-1888
 docker run -d --name node-red-1880 -p 1880:1880 -e TZ=Asia/Shanghai -e PORT=1880 \
   --add-host nginxIn.tshlms.com:192.168.50.177 \
   --add-host nginxin.tshlms.com:192.168.50.177 \
-  -v $(pwd)/data-1880:/data --restart unless-stopped energy-nodered-custom
+  -v $(pwd)/data-1880:/data --restart unless-stopped \
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 docker run -d --name node-red-1888 -p 1888:1888 -e TZ=Asia/Shanghai -e PORT=1888 \
   --add-host nginxIn.tshlms.com:192.168.50.177 \
   --add-host nginxin.tshlms.com:192.168.50.177 \
-  -v $(pwd)/data-1888:/data --restart unless-stopped energy-nodered-custom
+  -v $(pwd)/data-1888:/data --restart unless-stopped \
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 ```
 
 **域名是实例注册必须的**：agent 的注册地址是域名（默认 `http://nginxIn.tshlms.com:10130/energy/tenant-api`），容器必须能解析该域名，否则注册失败、平台看不到实例；flows 里的内网域名同理。故启动命令用 `--add-host <域名>:<内网IP>` 指定：
@@ -177,7 +187,7 @@ docker run -d --name energy-nodered-custom \
   -e AGENT_API_BASE=http://192.168.41.198:8200 \
   -e AGENT_HEARTBEAT_INTERVAL=100 \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 ```
 
 **日志与排查**：`docker logs -f energy-nodered-custom | grep agent`

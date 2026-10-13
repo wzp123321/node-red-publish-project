@@ -51,9 +51,10 @@ USER node-red
 mkdir -p data
 
 # 2. 拉取并启动官方镜像（挂载数据持久化 + 双账户认证配置）
-#    ⚠ 必须显式设置 NODE_RED_SETTINGS=/data/settings.js，否则 5.0 镜像不会加载认证配置
+#    ⚠ 官方基座里没有预置 settings.js，必须由容器命令追加 --settings 指定挂载进去的配置；
+#      Node-RED 没有 NODE_RED_SETTINGS 这个环境变量，写了不生效
 # $(pwd)表示当前目录，即/deploy目录
-docker run -d --name node-red -p 1880:1880  -e PORT=1880  -v $(pwd)/data:/data  -v $(pwd)/settings/settings.js:/data/settings.js  -e NODE_RED_SETTINGS=/data/settings.js  -e TZ=Asia/Shanghai  --restart unless-stopped  nodered/node-red:5.0.4
+docker run -d --name node-red -p 1880:1880  -e PORT=1880  -v $(pwd)/data:/data  -v $(pwd)/settings/settings.js:/data/settings.js  -e TZ=Asia/Shanghai  --restart unless-stopped  nodered/node-red:5.0.4  --settings /data/settings.js
 
 # 3. 验证
 docker ps | grep node-red      # 状态应为 Up
@@ -72,30 +73,32 @@ curl -I http://localhost:1880  # 返回 200
 | 文件                 | 作用                         | 构建机（打包） | 现场（运行） |
 | -------------------- | ---------------------------- | -------------- | ------------ |
 | Dockerfile           | 定义镜像内容（预装哪些节点） | ✅ 需要        | ❌ 不需要    |
-| settings/settings.js | 双账户认证配置               | ✅ 验证时用    | ✅ 需要      |
+| settings/settings.js | 双账户认证配置               | ✅ 需要        | ❌ 不需要    |
 | data/                | 数据持久化目录               | 自动生成       | ✅ 需要      |
+
+> `settings/settings.js` 在**构建期烧入镜像**（镜像内 `/usr/src/node-red/settings.js`），由 CMD 的 `--settings` 加载，现场运行时不需要携带、也不需要挂载；要改它必须重新构建镜像，只改宿主机文件不生效。
 
 #### 2.2 构建机（有外网）执行哪些命令
 
 ```bash
 # 1. 上传 deploy/ 目录，进入后构建镜像
 cd deploy
-docker build -t energy-nodered-custom .
+docker build -t harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 .
 
 # 2. （可选）先验证一次：启动 → 浏览器确认登录页和节点 → 停止
+#    settings.js 已烧入镜像，无需挂载、无需环境变量
 docker run -d --name energy-nodered-custom \
   -p 1880:1880 \
   -e TZ=Asia/Shanghai \
   -e PORT=1880 \
-  -e NODE_RED_SETTINGS=/data/settings.js \
   -v $(pwd)/data:/data \
-  -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 docker stop energy-nodered-custom && docker rm energy-nodered-custom
 
 # 3. 导出离线包
-docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
+docker save harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 \
+  | gzip > energy-nodered-custom.tar.gz
 ```
 
 **产出物（带到现场）**：`energy-nodered-custom.tar.gz` + 整个 `deploy/` 目录。
@@ -106,10 +109,9 @@ docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
 # 1. 导入镜像（本地导入，全程不联网）
 docker load < energy-nodered-custom.tar.gz
 
-# 2. 进入 deploy/ 目录，准备数据目录与配置（settings.js 必须存在，否则容器启动失败）
+# 2. 进入 deploy/ 目录，准备数据目录（settings.js 已烧入镜像，运行时不需要）
 cd deploy
 mkdir -p data
-ls settings/settings.js        # 确认文件存在，缺失则把 deploy/settings/settings.js 复制到 settings/ 下
 
 # 3. 若已有同名容器先清理
 docker rm -f energy-nodered-custom 2>/dev/null || true
@@ -117,16 +119,14 @@ docker rm -f energy-nodered-custom 2>/dev/null || true
 # 4. 数据卷权限（若容器反复重启，多为此问题）
 sudo chown -R 1000:1000 ./data/
 
-# 5. 启动（挂载数据持久化 + 双账户认证配置）
+# 5. 启动（settings.js 已烧入镜像、由镜像 CMD 的 --settings 加载，只需挂载数据卷）
 docker run -d --name energy-nodered-custom \
   -p 1880:1880 \
   -e TZ=Asia/Shanghai \
   -e PORT=1880 \
-  -e NODE_RED_SETTINGS=/data/settings.js \
   -v $(pwd)/data:/data \
-  -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 
 # 6. 验证
 docker ps | grep energy-nodered-custom       # 状态应为 Up
@@ -143,7 +143,7 @@ docker logs energy-nodered-custom            # 出现 "Server now running"
 
 ```bash
 docker rm -f energy-nodered-custom
-docker run -d --name energy-nodered-custom -p 1890:1890  -e TZ=Asia/Shanghai  -e PORT=1890   -e NODE_RED_SETTINGS=/data/settings.js   -v $(pwd)/data:/data   -v $(pwd)/settings/settings.js:/data/settings.js  --restart unless-stopped   energy-nodered-custom
+docker run -d --name energy-nodered-custom -p 1890:1890  -e TZ=Asia/Shanghai  -e PORT=1890   -v $(pwd)/data:/data  --restart unless-stopped   harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 ```
 
 > Windows PowerShell 把 `$(pwd)` 换成 `${PWD}`；`bash` 脚本同理可用。
@@ -155,8 +155,9 @@ docker run -d --name energy-nodered-custom -p 1890:1890  -e TZ=Asia/Shanghai  -e
 ```bash
 # 构建机：在 Dockerfile 追加（锁定版本，构建前用 npm view <包名> version 查最新版）
 #   RUN npm install --no-audit --no-fund <包名>@<版本>
-docker build -t energy-nodered-custom .
-docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
+docker build -t harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 .
+docker save harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 \
+  | gzip > energy-nodered-custom.tar.gz
 ```
 
 将新包带到现场：`docker load -i` → 备份 `./data` → 按 2.3 重新启动。
@@ -198,7 +199,7 @@ sqlite 节点不做相对路径解析，db 文件位置取决于你在节点配�
 
 - **先停后备份**：容器运行中直接拷贝 `./data` 可能拷到写入一半的文件（flows.json、sqlite），导致备份损坏。务必按第四章"备份"步骤先 `docker stop energy-nodered-custom`。
 - **sqlite WAL 附属文件**：若 db 启用了 WAL 模式（`journal_mode=WAL`），还会生成 `xxx.db-wal`、`xxx.db-shm`，只拷 `.db` 主文件会丢未合并数据。停容器后 WAL 自动合并；确需在线备份可用 sqlite3 的 `.backup` 命令。
-- **凭据成对备份**：`flows_cred.json` 依赖 `settings.js` 中的 `credentialSecret` 解密，两者必须**成对**备份/迁移。只拷 `./data` 不拷 `./settings/settings.js`，现场将无法解密凭据。
+- **凭据备份**：`flows_cred.json` 依赖 `credentialSecret` 解密。该值要么显式写在 `settings/settings.js` 里（构建期烧入镜像，改它必须重新构建），要么未显式设置时由 node-red 自动生成并存于 `./data/.config.runtime.json`——**两种情况备份 `./data` 即可**；显式配置的场景下另需记住 `settings/settings.js` 里的值。
 
 ---
 
@@ -236,7 +237,7 @@ docker restart node-red
 - Dashboard 认证为浏览器 Basic 弹窗（非登录页）；其 socket.io 实时推送不受认证保护，公网/严格场景建议加 nginx 反向代理。
 - 请妥善保管 `settings.js` 中的 `credentialSecret`，丢失后 `flows_cred.json` 无法解密。
 - 端口如需变更，修改 `-p` 映射并保持 `-e PORT` 一致后重启容器（如 `-p 8080:1880`，示例见 2.3.1）。
-- **Node-RED 5.0 镜像必须显式设置** **`-e NODE_RED_SETTINGS=/data/settings.js`**，否则挂载的 settings.js 不会被加载，adminAuth / httpNodeAuth 全部失效（表现为 `/` 和 `/dashboard` 都不弹登录页）。docker run 部署必须在命令中手动加上。
+- **settings.js 由镜像 CMD 的 `--settings` 加载**（构建期已烧入 `/usr/src/node-red/settings.js`），docker run 无需挂载、无需任何环境变量。**Node-RED 不存在 `NODE_RED_SETTINGS` 环境变量**——历史文档里的 `-e NODE_RED_SETTINGS=/data/settings.js` 是无效写法：本镜像不受影响（CMD 已指定），但直跑官方基座时会认证全失效（`/` 和 `/dashboard` 都不弹登录页），那种场景要改用 `--settings /data/settings.js`。
 
 ---
 
@@ -268,9 +269,11 @@ docker exec energy-nodered-hvac-0 grep credentialSecret /data/settings.js
 # 2) 改新服务的 settings.js（跟老服务一致）
 #    路径：/deploy/settings/settings.js
 #    找到 credentialSecret 行，替换成老服务的值
+#    settings.js 已烧入镜像，改完必须重新 docker build 并重新交付才生效，
+#    只改宿主机上的文件、或 docker restart 都不会生效（见 docs/deploy.md 第八章）
 ```
 
-> 为什么要先改？settings.js 在容器启动时读取，复制 `flows_cred.json` 之后 secret 不一致就报错了。
+> 为什么要先改？settings.js 在**镜像构建期**烧入，容器启动时由镜像 CMD 的 `--settings` 加载；复制 `flows_cred.json` 之后 secret 不一致就报错了。
 
 **无 credentialSecret 时的迁移命令**：
 
@@ -433,17 +436,15 @@ v3 的 `ui-template` 走 Vue 3，不接 AngularJS 语法；**没有 1:1 替代�
 # 手动部署（转换 + 人工处理完后再复制）
 cp /deploy/old-node-red-data/flows.v2.json /deploy/data/flows.json
 
-# 启动（docker run 命令行显式指定挂载/端口/认证配置）
+# 启动（settings.js 已烧入镜像、由镜像 CMD 的 --settings 加载，无需挂载、无需设环境变量）
 cd /deploy
 docker run -d --name energy-nodered-custom \
   -p 1890:1890 \
   -e TZ=Asia/Shanghai \
   -e PORT=1890 \
-  -e NODE_RED_SETTINGS=/data/settings.js \
   -v $(pwd)/data:/data \
-  -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 
 # 看启动日志
 docker logs -f energy-nodered-custom 2>&1 | grep "Server now running"
@@ -474,6 +475,7 @@ sudo chmod a+rwX /deploy/data/
 
 1. 拿老服务的 secret：`docker exec energy-nodered-hvac-0 grep credentialSecret /data/settings.js`
 2. 改 `/deploy/settings/settings.js` 的 `credentialSecret` 字段
-3. 重启：`docker restart energy-nodered-custom`
+3. **重新构建镜像并重新交付**：`docker build -t harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 .` → `docker rm -f energy-nodered-custom` → 按 2.3 重新启动（`./data` 不动）。
+   > settings.js 已烧入镜像，`docker restart` 或只改宿主机文件**都不会**让新 secret 生效。
 
 **预防**：迁移前先做 [第 1 步](#1-同步-credentialsecret动手前必做)。

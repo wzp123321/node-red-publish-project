@@ -7,10 +7,13 @@
  *   2. 注册成功后定时上报心跳，平台据此维护 在线/离线 状态
  *
  * 环境变量：
- *   AGENT_API_BASE              平台 API 基础地址，如 http://192.168.1.10:8080（经 nginx 代理时含代理前缀，如 http://192.168.1.10:8899/zp-api）
- *   AGENT_HEARTBEAT_INTERVAL    心跳间隔（秒），默认 30
+ *   AGENT_API_BASE              平台 API 基础地址，如 http://192.168.1.10:8080（经 nginx 代理时含代理前缀，如 http://192.168.1.10:8899/zp-api）；
+ *                               不配置则用内置默认地址 http://nginxIn.tshlms.com:10130/energy/tenant-api，末尾斜杠自动去除
+ *   AGENT_HEARTBEAT_INTERVAL    心跳间隔（秒），默认 60，最小 1
+ *   PORT                        Node-RED 监听端口，默认 1880；决定实例 ID Node-RED-${PORT}
  *
- * 说明：脚本每次启动都触发注册（无可选开关）；缺失 AGENT_API_BASE 时 warn 并退出
+ * 说明：脚本每次启动都触发注册（无可选开关）；未配置 AGENT_API_BASE 不会退出，
+ *       改用内置默认地址注册。下方 !API_BASE 校验仅在默认地址也被删空时才命中，属兜底分支。
  * ---------------------------------------------------------------------------
  */
 "use strict";

@@ -17,7 +17,6 @@
 │   ├── deploy.md                    # 镜像构建 + 部署 + 自动注册
 │   ├── migrate.md                   # 数据迁移
 │   └── deploy-and-migrate.md        # 历史合并文档（内容以 deploy.md / migrate.md 为准）
-├── node-server/           # 中心管理平台（Spring Boot，接收注册/心跳）
 ├── old-data/              # 迁移用：老容器数据备份
 ├── new-data/              # 迁移用：转换后的新数据
 ├── tools/                 # 迁移工具（dashboard converter）
@@ -31,7 +30,7 @@
 
 ```bash
 cd deploy
-docker build -t energy-nodered-custom .
+docker build -t harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 .
 mkdir -p data && sudo chown -R 1000:1000 ./data/
 docker run -d --name energy-nodered-custom \
   -p 1880:1880 \
@@ -41,7 +40,7 @@ docker run -d --name energy-nodered-custom \
   --add-host nginxin.tshlms.com:192.168.50.177 \
   -v $(pwd)/data:/data \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 # 访问 http://<IP>:1880
 ```
 
@@ -68,13 +67,12 @@ docker run -d --name energy-nodered-custom \
   --add-host nginxin.tshlms.com:192.168.50.177 \
   -v $(pwd)/data:/data \
   --restart unless-stopped \
-  energy-nodered-custom
+  harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
 ```
 
 ## 文档导航
 
-| 场景                           | 文档                                           |
-| ------------------------------ | ---------------------------------------------- |
-| 打包文件、构建镜像、部署、注册 | [docs/deploy.md](docs/deploy.md)               |
-| 从老版本迁移数据               | [docs/migrate.md](docs/migrate.md)             |
-| 中心管理平台（接收注册/心跳）  | [node-server/README.md](node-server/README.md) |
+| 场景                           | 文档                               |
+| ------------------------------ | ---------------------------------- |
+| 打包文件、构建镜像、部署、注册 | [docs/deploy.md](docs/deploy.md)   |
+| 从老版本迁移数据               | [docs/migrate.md](docs/migrate.md) |

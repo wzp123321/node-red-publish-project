@@ -4,21 +4,30 @@
 # 适用场景：现场完全离线，不允许/无法安装节点
 # 节点在构建期烧入镜像，现场零安装、开箱即用
 #
-# 构建（需外网，在构建机/CI 执行）：
-#   docker build -t energy-nodered-custom .
+# 镜像名:tag 固定为 harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0，
+# 由下方 docker build 的 -t 决定（Dockerfile 本身定义不了 tag）。
+# 升版本时改 tag 并同步本段命令：
 #
-# 导出离线包（传输到现场）：
-#   docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
+# 构建（需外网，在构建机/CI 执行）：
+#   docker build -t harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 .
+#
+# 交付二选一：
+#   1) 推送 Harbor，现场 docker login 后 pull：
+#      docker push harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0
+#   2) 导出离线包（传输到现场）：
+#      docker save harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 \
+#        | gzip > energy-nodered-custom.tar.gz
 #
 # 现场导入并启动：
 #   docker load -i energy-nodered-custom.tar.gz
+#   save/load 会原样保留上面这个 tag，现场用完整镜像名启动即可
 #   启动命令见 docs/deploy.md：只需挂载数据卷 /data + 指定端口；
 #   settings.js 已烧入镜像，启动时由 CMD 的 --settings 直接加载，无需挂载
 #
 # 自动注册 Agent（deploy/agent/main.js，零依赖，仅用 Node 内置 http/https）：
-#   容器启动即拉起 agent；未配置 AGENT_API_BASE 时 agent 立即退出，与老镜像行为一致。
-#   需要注册时在 docker run 加环境变量 AGENT_API_BASE（可选 AGENT_HEARTBEAT_INTERVAL），
-#   详见 docs/deploy.md「自动注册机制」章节。
+#   容器启动即拉起 agent 并注册，无开关；未配 AGENT_API_BASE 时用代码内置默认地址
+#   http://nginxIn.tshlms.com:10130/energy/tenant-api，需换地址时在 docker run 加环境变量
+#   AGENT_API_BASE（可选 AGENT_HEARTBEAT_INTERVAL），详见 docs/deploy.md「自动注册机制」章节。
 
 FROM nodered/node-red:5.0.4
 
@@ -73,5 +82,6 @@ ENTRYPOINT ["bash", "/usr/src/node-red/agent-entrypoint.sh"]
 
 # 传给官方 entrypoint，由其透传给 red.js：始终加载镜像内出厂 settings.js。
 # 现场需临时换配置（不改镜像）时，在 docker run 末尾覆盖即可，如：
-#   docker run ... energy-nodered-custom --settings /tmp/settings.js
+#   docker run ... harbor.tiansu.com:8443/energy/energy-nodered-custom:1.1.0 \
+#     --settings /tmp/settings.js
 CMD ["--settings", "/usr/src/node-red/settings.js"]
