@@ -80,10 +80,10 @@ curl -I http://localhost:1880  # 返回 200
 ```bash
 # 1. 上传 deploy/ 目录，进入后构建镜像
 cd deploy
-docker build -t node-red-custom:5.0.4 .
+docker build -t energy-nodered-custom .
 
 # 2. （可选）先验证一次：启动 → 浏览器确认登录页和节点 → 停止
-docker run -d --name node-red-custom \
+docker run -d --name energy-nodered-custom \
   -p 1880:1880 \
   -e TZ=Asia/Shanghai \
   -e PORT=1880 \
@@ -91,20 +91,20 @@ docker run -d --name node-red-custom \
   -v $(pwd)/data:/data \
   -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  node-red-custom:5.0.4
-docker stop node-red-custom && docker rm node-red-custom
+  energy-nodered-custom
+docker stop energy-nodered-custom && docker rm energy-nodered-custom
 
 # 3. 导出离线包
-docker save node-red-custom:5.0.4 | gzip > node-red-custom-5.0.4.tar.gz
+docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
 ```
 
-**产出物（带到现场）**：`node-red-custom-5.0.4.tar.gz` + 整个 `deploy/` 目录。
+**产出物（带到现场）**：`energy-nodered-custom.tar.gz` + 整个 `deploy/` 目录。
 
 #### 2.3 现场（离线）执行哪些命令
 
 ```bash
 # 1. 导入镜像（本地导入，全程不联网）
-docker load < node-red-custom-5.0.4.tar.gz
+docker load < energy-nodered-custom.tar.gz
 
 # 2. 进入 deploy/ 目录，准备数据目录与配置（settings.js 必须存在，否则容器启动失败）
 cd deploy
@@ -112,13 +112,13 @@ mkdir -p data
 ls settings/settings.js        # 确认文件存在，缺失则把 deploy/settings/settings.js 复制到 settings/ 下
 
 # 3. 若已有同名容器先清理
-docker rm -f node-red-custom 2>/dev/null || true
+docker rm -f energy-nodered-custom 2>/dev/null || true
 
 # 4. 数据卷权限（若容器反复重启，多为此问题）
 sudo chown -R 1000:1000 ./data/
 
 # 5. 启动（挂载数据持久化 + 双账户认证配置）
-docker run -d --name node-red-custom \
+docker run -d --name energy-nodered-custom \
   -p 1880:1880 \
   -e TZ=Asia/Shanghai \
   -e PORT=1880 \
@@ -126,11 +126,11 @@ docker run -d --name node-red-custom \
   -v $(pwd)/data:/data \
   -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  node-red-custom:5.0.4
+  energy-nodered-custom
 
 # 6. 验证
-docker ps | grep node-red-custom       # 状态应为 Up
-docker logs node-red-custom            # 出现 "Server now running"
+docker ps | grep energy-nodered-custom       # 状态应为 Up
+docker logs energy-nodered-custom            # 出现 "Server now running"
 ```
 
 浏览器访问 `http://现场IP:1880`。
@@ -142,8 +142,8 @@ docker logs node-red-custom            # 出现 "Server now running"
 容器内仍是 1880，只改对外映射（示例改为 1890，`-p` 与 `-e PORT` 需保持一致）：
 
 ```bash
-docker rm -f node-red-custom
-docker run -d --name node-red-custom -p 1890:1890  -e TZ=Asia/Shanghai  -e PORT=1890   -e NODE_RED_SETTINGS=/data/settings.js   -v $(pwd)/data:/data   -v $(pwd)/settings/settings.js:/data/settings.js  --restart unless-stopped   node-red-custom:5.0.4
+docker rm -f energy-nodered-custom
+docker run -d --name energy-nodered-custom -p 1890:1890  -e TZ=Asia/Shanghai  -e PORT=1890   -e NODE_RED_SETTINGS=/data/settings.js   -v $(pwd)/data:/data   -v $(pwd)/settings/settings.js:/data/settings.js  --restart unless-stopped   energy-nodered-custom
 ```
 
 > Windows PowerShell 把 `$(pwd)` 换成 `${PWD}`；`bash` 脚本同理可用。
@@ -155,8 +155,8 @@ docker run -d --name node-red-custom -p 1890:1890  -e TZ=Asia/Shanghai  -e PORT=
 ```bash
 # 构建机：在 Dockerfile 追加（锁定版本，构建前用 npm view <包名> version 查最新版）
 #   RUN npm install --no-audit --no-fund <包名>@<版本>
-docker build -t node-red-custom:5.0.4 .
-docker save node-red-custom:5.0.4 | gzip > node-red-custom-5.0.4.tar.gz
+docker build -t energy-nodered-custom .
+docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
 ```
 
 将新包带到现场：`docker load -i` → 备份 `./data` → 按 2.3 重新启动。
@@ -176,9 +176,9 @@ docker save node-red-custom:5.0.4 | gzip > node-red-custom-5.0.4.tar.gz
 
 - 数据卷映射：`./data:/data`，容器内数据（flows、凭据）均落盘到宿主机 `./data`。
 - 预装节点在镜像层，容器重建不影响；数据卷内容（`./data`）需单独备份。
-- **备份**：先 `docker stop node-red-custom` 停容器（保证文件写入完整）→ 打包 `./data` 目录 → 再 `docker start node-red-custom`。
+- **备份**：先 `docker stop energy-nodered-custom` 停容器（保证文件写入完整）→ 打包 `./data` 目录 → 再 `docker start energy-nodered-custom`。
 - **迁移**：新服务器放置 `./data` 与交付文件后按 2.3 启动。
-- **删除容器不丢数据**：`docker rm -f node-red-custom` 只删容器，`./data` 保留。
+- **删除容器不丢数据**：`docker rm -f energy-nodered-custom` 只删容器，`./data` 保留。
 
 #### 4.1 sqlite 数据库文件路径（务必配置绝对路径）
 
@@ -196,7 +196,7 @@ sqlite 节点不做相对路径解析，db 文件位置取决于你在节点配�
 
 #### 4.2 备份与迁移注意事项
 
-- **先停后备份**：容器运行中直接拷贝 `./data` 可能拷到写入一半的文件（flows.json、sqlite），导致备份损坏。务必按第四章"备份"步骤先 `docker stop node-red-custom`。
+- **先停后备份**：容器运行中直接拷贝 `./data` 可能拷到写入一半的文件（flows.json、sqlite），导致备份损坏。务必按第四章"备份"步骤先 `docker stop energy-nodered-custom`。
 - **sqlite WAL 附属文件**：若 db 启用了 WAL 模式（`journal_mode=WAL`），还会生成 `xxx.db-wal`、`xxx.db-shm`，只拷 `.db` 主文件会丢未合并数据。停容器后 WAL 自动合并；确需在线备份可用 sqlite3 的 `.backup` 命令。
 - **凭据成对备份**：`flows_cred.json` 依赖 `settings.js` 中的 `credentialSecret` 解密，两者必须**成对**备份/迁移。只拷 `./data` 不拷 `./settings/settings.js`，现场将无法解密凭据。
 
@@ -435,7 +435,7 @@ cp /deploy/old-node-red-data/flows.v2.json /deploy/data/flows.json
 
 # 启动（docker run 命令行显式指定挂载/端口/认证配置）
 cd /deploy
-docker run -d --name node-red-custom \
+docker run -d --name energy-nodered-custom \
   -p 1890:1890 \
   -e TZ=Asia/Shanghai \
   -e PORT=1890 \
@@ -443,10 +443,10 @@ docker run -d --name node-red-custom \
   -v $(pwd)/data:/data \
   -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  node-red-custom:5.0.4
+  energy-nodered-custom
 
 # 看启动日志
-docker logs -f node-red-custom 2>&1 | grep "Server now running"
+docker logs -f energy-nodered-custom 2>&1 | grep "Server now running"
 # 出现 Server now running at http://0.0.0.0:1890 即成功
 
 # 浏览器访问 http://<服务器IP>:1890
@@ -474,6 +474,6 @@ sudo chmod a+rwX /deploy/data/
 
 1. 拿老服务的 secret：`docker exec energy-nodered-hvac-0 grep credentialSecret /data/settings.js`
 2. 改 `/deploy/settings/settings.js` 的 `credentialSecret` 字段
-3. 重启：`docker restart node-red-custom`
+3. 重启：`docker restart energy-nodered-custom`
 
 **预防**：迁移前先做 [第 1 步](#1-同步-credentialsecret动手前必做)。

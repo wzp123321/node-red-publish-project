@@ -31,9 +31,9 @@
 
 ```bash
 cd deploy
-docker build -t node-red-custom:5.0.4 .
+docker build -t energy-nodered-custom .
 mkdir -p data && sudo chown -R 1000:1000 ./data/
-docker run -d --name node-red-custom \
+docker run -d --name energy-nodered-custom \
   -p 1880:1880 \
   -e TZ=Asia/Shanghai \
   -e PORT=1880 \
@@ -41,7 +41,7 @@ docker run -d --name node-red-custom \
   --add-host nginxin.tshlms.com:192.168.50.177 \
   -v $(pwd)/data:/data \
   --restart unless-stopped \
-  node-red-custom:5.0.4
+  energy-nodered-custom
 # 访问 http://<IP>:1880
 ```
 
@@ -60,7 +60,7 @@ docker run -d --name node-red-custom \
 
 # 3) 启动新服务
 cd deploy
-docker run -d --name node-red-custom \
+docker run -d --name energy-nodered-custom \
   -p 1880:1880 \
   -e TZ=Asia/Shanghai \
   -e PORT=1880 \
@@ -68,7 +68,7 @@ docker run -d --name node-red-custom \
   --add-host nginxin.tshlms.com:192.168.50.177 \
   -v $(pwd)/data:/data \
   --restart unless-stopped \
-  node-red-custom:5.0.4
+  energy-nodered-custom
 ```
 
 ## 文档导航

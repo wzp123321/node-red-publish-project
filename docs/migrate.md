@@ -193,7 +193,7 @@ cp /deploy/old-node-red-data/flows.v2.json /deploy/data/flows.json
 
 # 启动（docker run 命令行显式指定挂载/端口/认证配置）
 cd /deploy
-docker run -d --name node-red-custom \
+docker run -d --name energy-nodered-custom \
   -p 1890:1890 \
   -e TZ=Asia/Shanghai \
   -e PORT=1890 \
@@ -201,10 +201,10 @@ docker run -d --name node-red-custom \
   -v $(pwd)/data:/data \
   -v $(pwd)/settings/settings.js:/data/settings.js \
   --restart unless-stopped \
-  node-red-custom:5.0.4
+  energy-nodered-custom
 
 # 看启动日志
-docker logs -f node-red-custom 2>&1 | grep "Server now running"
+docker logs -f energy-nodered-custom 2>&1 | grep "Server now running"
 # 出现 Server now running at http://0.0.0.0:1890 即成功
 
 # 浏览器访问 http://<服务器IP>:1890
@@ -224,7 +224,7 @@ sudo chmod a+rw /deploy/data/*.db
 sudo chmod a+rwX /deploy/data/
 
 # 重启服务-red-custom
-docker restart node-red-custom
+docker restart energy-nodered-custom
 ```
 
 ### Q2: 启动报 credential decrypt failed
@@ -235,6 +235,6 @@ docker restart node-red-custom
 
 1. 拿老服务的 secret：`docker exec energy-nodered-hvac-0 grep credentialSecret /data/settings.js`
 2. 改 `/deploy/settings/settings.js` 的 `credentialSecret` 字段
-3. 重启：`docker restart node-red-custom`
+3. 重启：`docker restart energy-nodered-custom`
 
 **预防**：迁移前先做 [第 1 步](#1-同步-credentialsecret动手前必做)。

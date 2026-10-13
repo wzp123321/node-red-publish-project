@@ -5,13 +5,13 @@
 # 节点在构建期烧入镜像，现场零安装、开箱即用
 #
 # 构建（需外网，在构建机/CI 执行）：
-#   docker build -t node-red-custom:5.0.4 .
+#   docker build -t energy-nodered-custom .
 #
 # 导出离线包（传输到现场）：
-#   docker save node-red-custom:5.0.4 | gzip > node-red-5.0.4.tar.gz
+#   docker save energy-nodered-custom | gzip > energy-nodered-custom.tar.gz
 #
 # 现场导入并启动：
-#   docker load -i node-red-5.0.4.tar.gz
+#   docker load -i energy-nodered-custom.tar.gz
 #   启动命令见 docs/deploy.md：只需挂载数据卷 /data + 指定端口；
 #   settings.js 已烧入镜像，启动时由 CMD 的 --settings 直接加载，无需挂载
 #
@@ -73,5 +73,5 @@ ENTRYPOINT ["bash", "/usr/src/node-red/agent-entrypoint.sh"]
 
 # 传给官方 entrypoint，由其透传给 red.js：始终加载镜像内出厂 settings.js。
 # 现场需临时换配置（不改镜像）时，在 docker run 末尾覆盖即可，如：
-#   docker run ... node-red-custom:5.0.4 --settings /tmp/settings.js
+#   docker run ... energy-nodered-custom --settings /tmp/settings.js
 CMD ["--settings", "/usr/src/node-red/settings.js"]
